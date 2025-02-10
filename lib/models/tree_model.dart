@@ -61,7 +61,7 @@ class TreeDetails {
   final double? seaLevel;
   final String? imagePath;
   final String? note;
-  final DateTime? createdAt;
+  final String? createdAt;  // Đổi kiểu từ DateTime sang String
   final MasterTreeInfo? masterInfo;
 
   TreeDetails({
@@ -83,19 +83,27 @@ class TreeDetails {
     return TreeDetails(
       id: json['id'],
       masterTreeId: json['master_tree_id'],
-      coordinateX: json['coordinate_x'],
-      coordinateY: json['coordinate_y'],
-      height: json['height'],
-      diameter: json['trunk_diameter'],
+      coordinateX: json['coordinate_x'] != null ? double.parse(json['coordinate_x'].toString()) : null,
+      coordinateY: json['coordinate_y'] != null ? double.parse(json['coordinate_y'].toString()) : null,
+      height: json['height'] != null ? double.parse(json['height'].toString()) : null,
+      diameter: json['trunk_diameter'] != null ? double.parse(json['trunk_diameter'].toString()) : null,
       coverLevel: json['canopy_coverage'],
-      seaLevel: json['sea_level_height'],
+      seaLevel: json['sea_level_height'] != null ? double.parse(json['sea_level_height'].toString()) : null,
       imagePath: json['image_url'],
       note: json['notes'],
-      createdAt: json['created_at'] != null 
-        ? DateTime.parse(json['created_at']) 
-        : null,
+      createdAt: json['created_at']?.toString(),  // Chỉ chuyển sang String
       masterInfo: json['tree_type'] != null 
-        ? MasterTreeInfo.fromJson(json) 
+        ? MasterTreeInfo.fromJson({
+            'id': json['master_tree_id'],
+            'tree_type': json['tree_type'],
+            'scientific_name': json['scientific_name'],
+            'vietnamese_name': json['vietnamese_name'],
+            'branch': json['branch'],
+            'class': json['class'],
+            'division': json['division'],
+            'family': json['family'],
+            'genus': json['genus'],
+          }) 
         : null,
     );
   }
@@ -112,7 +120,7 @@ class TreeDetails {
       'sea_level_height': seaLevel,
       'image_url': imagePath,
       'notes': note,
-      'created_at': createdAt?.toIso8601String(),
+      'created_at': createdAt,
     };
   }
 }

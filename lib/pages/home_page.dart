@@ -1,7 +1,10 @@
+
+
 import 'package:flutter/material.dart';
-import '../models/tree_model.dart';
+import 'package:golon_babe/models/tree_model.dart';
+import 'package:golon_babe/widgets/tree_form/tree_form.dart';
+
 import '../repositories/tree_repository.dart';
-import '../widgets/tree_form.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -48,8 +51,8 @@ class _HomePageState extends State<HomePage> {
 
       if (success) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Lưu thông tin thành công'),
+          SnackBar(
+            content: Text(details.id != null ? 'Cập nhật thông tin thành công' : 'Lưu thông tin thành công'),
             backgroundColor: Colors.green,
           ),
         );
@@ -89,6 +92,7 @@ class _HomePageState extends State<HomePage> {
           : TreeForm(
               masterTreeList: _masterTreeList,
               onSubmit: _handleSubmit,
+              repository: _repository,
             ),
     );
   }

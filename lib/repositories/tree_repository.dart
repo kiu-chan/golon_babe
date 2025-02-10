@@ -1,5 +1,4 @@
 import 'package:golon_babe/database/database_helper.dart';
-
 import '../models/tree_model.dart';
 
 class TreeRepository {
@@ -21,9 +20,15 @@ class TreeRepository {
     return data.map((json) => TreeDetails.fromJson(json)).toList();
   }
 
+Future<TreeDetails?> getTreeDetailsById(int id) async {
+  final data = await _db.getTreeDetailsById(id);
+  if (data == null) return null;
+  return TreeDetails.fromJson(data);
+}
+
   Future<bool> saveTreeDetails(TreeDetails details) async {
-    // Convert TreeDetails to database format
     final Map<String, dynamic> dbData = {
+      'master_tree_id': details.masterTreeId,
       'coordinate_x': details.coordinateX,
       'coordinate_y': details.coordinateY,
       'height': details.height,
@@ -34,10 +39,17 @@ class TreeRepository {
       'notes': details.note,
     };
 
-    return await _db.insertTreeDetail(
-      masterTreeId: details.masterTreeId,
-      details: dbData,
-    );
+    if (details.id != null) {
+      return await _db.updateTreeDetail(
+        id: details.id!,
+        details: dbData,
+      );
+    } else {
+      return await _db.insertTreeDetail(
+        masterTreeId: details.masterTreeId,
+        details: dbData,
+      );
+    }
   }
 
   Future<void> dispose() async {
