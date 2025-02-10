@@ -177,17 +177,27 @@ Future<bool> searchTreeById(String id) async {
     }
   }
 
-  Future<void> pickImage(ImageSource source, BuildContext context) async {
+Future<void> pickImage(ImageSource source, BuildContext context) async {
     try {
       final ImagePicker picker = ImagePicker();
-      final XFile? image = await picker.pickImage(source: source);
+      final XFile? image = await picker.pickImage(
+        source: source,
+        imageQuality: 85, // Giảm chất lượng ảnh để tối ưu bộ nhớ
+        maxWidth: 1024, // Giới hạn chiều rộng tối đa
+        maxHeight: 1024, // Giới hạn chiều cao tối đa
+      );
+      
       if (image != null) {
         imagePath = image.path;
       }
     } catch (e) {
       if (!context.mounted) return;
+      String errorMessage = 'Không thể mở máy ảnh';
+      if (e.toString().contains('permission')) {
+        errorMessage = 'Vui lòng cấp quyền truy cập máy ảnh trong cài đặt';
+      }
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Không thể mở máy ảnh')),
+        SnackBar(content: Text(errorMessage)),
       );
     }
   }
