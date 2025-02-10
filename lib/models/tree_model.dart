@@ -2,7 +2,7 @@ class MasterTreeInfo {
   final int id;
   final String treeType;
   final String? scientificName;
-  final String? vietnameseName;
+  final String? tayName;  
   final String? branch;
   final String? treeClass;
   final String? division;
@@ -13,7 +13,7 @@ class MasterTreeInfo {
     required this.id,
     required this.treeType,
     this.scientificName,
-    this.vietnameseName,
+    this.tayName,
     this.branch,
     this.treeClass,
     this.division,
@@ -26,7 +26,7 @@ class MasterTreeInfo {
       id: json['id'],
       treeType: json['tree_type'],
       scientificName: json['scientific_name'],
-      vietnameseName: json['vietnamese_name'],
+      tayName: json['tay_name'],
       branch: json['branch'],
       treeClass: json['class'],
       division: json['division'],
@@ -40,7 +40,7 @@ class MasterTreeInfo {
       'id': id,
       'tree_type': treeType,
       'scientific_name': scientificName,
-      'vietnamese_name': vietnameseName,
+      'tay_name': tayName,
       'branch': branch,
       'class': treeClass,
       'division': division,
@@ -97,7 +97,7 @@ class TreeDetails {
             'id': json['master_tree_id'],
             'tree_type': json['tree_type'],
             'scientific_name': json['scientific_name'],
-            'vietnamese_name': json['vietnamese_name'],
+            'tay_name': json['tay_name'],
             'branch': json['branch'],
             'class': json['class'],
             'division': json['division'],

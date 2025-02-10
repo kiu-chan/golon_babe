@@ -14,7 +14,7 @@ class TreeFormController {
   final diameterController = TextEditingController();
   final seaLevelController = TextEditingController();
   final noteController = TextEditingController();
-  final latinNameController = TextEditingController();
+  final tayNameController = TextEditingController();
   final scientificNameController = TextEditingController();
   final branchController = TextEditingController();
   final treeClassController = TextEditingController();
@@ -40,7 +40,7 @@ class TreeFormController {
     diameterController.dispose();
     seaLevelController.dispose();
     noteController.dispose();
-    latinNameController.dispose();
+    tayNameController.dispose();
     scientificNameController.dispose();
     branchController.dispose();
     treeClassController.dispose();
@@ -52,7 +52,7 @@ class TreeFormController {
   void updateTreeInfo(MasterTreeInfo? tree) {
     selectedTree = tree;
     if (tree != null) {
-      latinNameController.text = tree.vietnameseName ?? '';
+      tayNameController.text = tree.tayName ?? '';
       scientificNameController.text = tree.scientificName ?? '';
       branchController.text = tree.branch ?? '';
       treeClassController.text = tree.treeClass ?? '';
@@ -60,7 +60,7 @@ class TreeFormController {
       familyController.text = tree.family ?? '';
       genusController.text = tree.genus ?? '';
     } else {
-      latinNameController.clear();
+      tayNameController.clear();
       scientificNameController.clear();
       branchController.clear();
       treeClassController.clear();

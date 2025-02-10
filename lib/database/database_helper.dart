@@ -42,7 +42,7 @@ class DatabaseHelper {
   Future<List<Map<String, dynamic>>> getTreeDetails() async {
     final conn = await connection;
     final results = await conn.mappedResultsQuery('''
-      SELECT td.*, mti.tree_type, mti.scientific_name, mti.vietnamese_name,
+      SELECT td.*, mti.tree_type, mti.scientific_name, mti.tay_name,
              mti.branch, mti.class, mti.division, mti.family, mti.genus
       FROM tree_details td
       JOIN master_tree_info mti ON td.master_tree_id = mti.id
@@ -58,7 +58,7 @@ class DatabaseHelper {
 Future<Map<String, dynamic>?> getTreeDetailsById(int id) async {
   final conn = await connection;
   final results = await conn.mappedResultsQuery('''
-    SELECT td.*, mti.tree_type, mti.scientific_name, mti.vietnamese_name,
+    SELECT td.*, mti.tree_type, mti.scientific_name, mti.tay_name,
            mti.branch, mti.class, mti.division, mti.family, mti.genus
     FROM tree_details td
     JOIN master_tree_info mti ON td.master_tree_id = mti.id
