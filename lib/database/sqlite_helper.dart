@@ -130,24 +130,42 @@ class SQLiteHelper {
   }
 
   // CRUD cho tree_details
-  Future<int> insertTreeDetail(Map<String, dynamic> detail) async {
-    try {
-      final db = await database;
-      return await db.insert(
-        'tree_details',
-        {
-          ...detail,
-          'created_at': DateTime.now().toIso8601String(),
-          'updated_at': DateTime.now().toIso8601String(),
-          'sync_status': 'pending',
-        },
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
-    } catch (e) {
-      print('Lỗi khi thêm tree detail vào local: $e');
-      rethrow;
-    }
+Future<int> insertTreeDetail(Map<String, dynamic> detail) async {
+  try {
+    final db = await database;
+    print('Đang thêm chi tiết cây vào local:');
+    print(detail);
+    
+    // Chuyển đổi thời gian sang String
+    final insertData = {
+      'id': detail['id'],
+      'master_tree_id': detail['master_tree_id'],
+      'coordinate_x': detail['coordinate_x'],
+      'coordinate_y': detail['coordinate_y'],
+      'height': detail['height'],
+      'trunk_diameter': detail['trunk_diameter'],
+      'canopy_coverage': detail['canopy_coverage'],
+      'sea_level_height': detail['sea_level_height'], 
+      'image_base64': detail['image_base64'],
+      'notes': detail['notes'],
+      'created_at': detail['created_at']?.toString(), // Chuyển sang string
+      'updated_at': detail['updated_at']?.toString() ?? DateTime.now().toIso8601String(),
+      'sync_status': detail['sync_status'] ?? 'pending',
+    };
+
+    final id = await db.insert(
+      'tree_details',
+      insertData,
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+    print('Đã thêm chi tiết cây với id: $id');
+    return id;
+  } catch (e) {
+    print('Lỗi khi thêm tree detail vào local: $e');
+    print('Stack trace: ${StackTrace.current}');
+    throw e;
   }
+}
 
   Future<bool> updateTreeDetail(int id, Map<String, dynamic> detail) async {
     try {
@@ -169,54 +187,67 @@ class SQLiteHelper {
     }
   }
 
-  Future<TreeDetails?> getTreeDetailsById(int id) async {
-    try {
-      final db = await database;
-      
-      // Lấy chi tiết cây
-      final detailsResult = await db.query(
-        'tree_details',
-        where: 'id = ?',
-        whereArgs: [id],
-      );
+Future<TreeDetails?> getTreeDetailsById(int id) async {
+  try {
+    final db = await database;
+    
+    // Sử dụng LEFT JOIN để lấy cả thông tin từ cả hai bảng
+    final results = await db.rawQuery('''
+      SELECT td.*, mti.tree_type, mti.scientific_name, mti.tay_name,
+             mti.branch, mti.class, mti.division, mti.family, mti.genus
+      FROM tree_details td
+      LEFT JOIN master_tree_info mti ON td.master_tree_id = mti.id
+      WHERE td.id = ?
+    ''', [id]);
 
-      if (detailsResult.isEmpty) return null;
-
-      // Lấy thông tin master tree
-      final masterResult = await db.query(
-        'master_tree_info',
-        where: 'id = ?',
-        whereArgs: [detailsResult.first['master_tree_id']],
-      );
-
-      final combinedData = {
-        ...detailsResult.first,
-        if (masterResult.isNotEmpty) ...masterResult.first,
-      };
-      print('Lấy chi tiết cây từ local...');
-
-      return TreeDetails.fromJson(combinedData);
-    } catch (e) {
-      print('Lỗi khi lấy tree detail từ local: $e');
+    if (results.isEmpty) {
+      print('Không tìm thấy chi tiết cây $id trong local database');
       return null;
     }
-  }
 
-  Future<List<Map<String, dynamic>>> getAllTreeDetails() async {
-    try {
-      final db = await database;
-      final results = await db.rawQuery('''
-        SELECT td.*, mti.*
-        FROM tree_details td
-        LEFT JOIN master_tree_info mti ON td.master_tree_id = mti.id
-        ORDER BY td.created_at DESC
-      ''');
-      return results;
-    } catch (e) {
-      print('Lỗi khi lấy tất cả tree details từ local: $e');
-      return [];
-    }
+    // Log thông tin debug
+    print('Dữ liệu từ local database cho cây $id:');
+    print(results.first);
+
+    // Chuyển đổi dữ liệu và trả về
+    final combinedData = {
+      ...results.first,
+      'id': results.first['id'],
+      'master_tree_id': results.first['master_tree_id'],
+      'tree_type': results.first['tree_type'],
+      'scientific_name': results.first['scientific_name'],
+      'tay_name': results.first['tay_name'],
+      'branch': results.first['branch'],
+      'class': results.first['class'],
+      'division': results.first['division'],
+      'family': results.first['family'],
+      'genus': results.first['genus'],
+    };
+
+    return TreeDetails.fromJson(combinedData);
+  } catch (e) {
+    print('Lỗi khi lấy chi tiết cây từ local database: $e');
+    print('Stack trace: ${StackTrace.current}');
+    return null;
   }
+}
+
+Future<List<Map<String, dynamic>>> getAllTreeDetails() async {
+  try {
+    final db = await database;
+    final results = await db.rawQuery('''
+      SELECT td.*, mti.tree_type, mti.scientific_name, mti.tay_name,
+             mti.branch, mti.class, mti.division, mti.family, mti.genus
+      FROM tree_details td
+      INNER JOIN master_tree_info mti ON td.master_tree_id = mti.id 
+      ORDER BY td.created_at DESC
+    ''');
+    return results;
+  } catch (e) {
+    print('Lỗi khi lấy tất cả tree details từ local: $e');
+    return [];
+  }
+}
 
   Future<List<Map<String, dynamic>>> getPendingSyncTreeDetails() async {
     try {

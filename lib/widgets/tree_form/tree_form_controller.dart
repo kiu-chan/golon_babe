@@ -70,40 +70,41 @@ class TreeFormController {
     }
   }
 
-  Future<bool> searchTreeById(String id) async {
-    try {
-      final idNumber = int.tryParse(id);
-      if (idNumber == null) return false;
+Future<bool> searchTreeById(String id) async {
+  try {
+    final idNumber = int.tryParse(id);
+    if (idNumber == null) return false;
+    
+    // Lấy dữ liệu từ repository và xử lý kết quả
+    final tree = await _repository.getTreeDetailsById(idNumber);
+    if (tree != null) {
+      isEditing = true;
+      editingId = tree.id;
       
-      final tree = await _repository.getTreeDetailsById(idNumber);
-      if (tree != null) {
-        isEditing = true;
-        editingId = tree.id;
-        
-        coordinateXController.text = tree.coordinateX?.toString() ?? '';
-        coordinateYController.text = tree.coordinateY?.toString() ?? '';
-        heightController.text = tree.height?.toString() ?? '';
-        diameterController.text = tree.diameter?.toString() ?? '';
-        selectedCoverLevel = tree.coverLevel;
-        seaLevelController.text = tree.seaLevel?.toString() ?? '';
-        noteController.text = tree.note ?? '';
-        imageBase64 = tree.imageBase64;
-        
-        if (tree.masterInfo != null) {
-          selectedTree = tree.masterInfo;
-          updateTreeInfo(tree.masterInfo);
-        }
-        return true;
-      } else {
-        resetForm();
-        return false;
+      coordinateXController.text = tree.coordinateX?.toString() ?? '';
+      coordinateYController.text = tree.coordinateY?.toString() ?? '';
+      heightController.text = tree.height?.toString() ?? '';
+      diameterController.text = tree.diameter?.toString() ?? '';
+      selectedCoverLevel = tree.coverLevel;
+      seaLevelController.text = tree.seaLevel?.toString() ?? '';
+      noteController.text = tree.note ?? '';
+      imageBase64 = tree.imageBase64;
+      
+      if (tree.masterInfo != null) {
+        selectedTree = tree.masterInfo;
+        updateTreeInfo(tree.masterInfo);
       }
-    } catch (e) {
-      print('Error searching tree: $e');
+      return true;
+    } else {
       resetForm();
       return false;
     }
+  } catch (e) {
+    print('Error searching tree: $e');
+    resetForm();
+    return false;
   }
+}
 
   void resetForm() {
     isEditing = false;

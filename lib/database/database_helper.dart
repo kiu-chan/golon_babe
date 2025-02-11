@@ -358,16 +358,16 @@ Future<Map<String, dynamic>?> getTreeDetailsById(int id) async {
     }
   }
 
-  Future<bool> testConnection() async {
-    try {
-      final conn = await connection;
-      await conn.query('SELECT 1');
-      return true;
-    } catch (e) {
-      print('Connection test failed: $e');
-      return false;
-    }
+Future<bool> testConnection() async {
+  try {
+    final conn = await connection;
+    await conn.query('SELECT 1');
+    return true;
+  } catch (e) {
+    print('Connection test failed: $e');
+    return false;
   }
+}
 
   Future<void> close() async {
     if (_connection != null && !_connection!.isClosed) {
