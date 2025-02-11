@@ -59,9 +59,9 @@ class TreeDetails {
   final double? diameter;
   final String? coverLevel;
   final double? seaLevel;
-  final String? imagePath;
+  final String? imageBase64;
   final String? note;
-  final String? createdAt;  // Đổi kiểu từ DateTime sang String
+  final String? createdAt;
   final MasterTreeInfo? masterInfo;
 
   TreeDetails({
@@ -73,7 +73,7 @@ class TreeDetails {
     this.diameter,
     this.coverLevel,
     this.seaLevel,
-    this.imagePath,
+    this.imageBase64,
     this.note,
     this.createdAt,
     this.masterInfo,
@@ -89,9 +89,9 @@ class TreeDetails {
       diameter: json['trunk_diameter'] != null ? double.parse(json['trunk_diameter'].toString()) : null,
       coverLevel: json['canopy_coverage'],
       seaLevel: json['sea_level_height'] != null ? double.parse(json['sea_level_height'].toString()) : null,
-      imagePath: json['image_url'],
+      imageBase64: json['image_base64'],
       note: json['notes'],
-      createdAt: json['created_at']?.toString(),  // Chỉ chuyển sang String
+      createdAt: json['created_at']?.toString(),
       masterInfo: json['tree_type'] != null 
         ? MasterTreeInfo.fromJson({
             'id': json['master_tree_id'],
@@ -118,7 +118,7 @@ class TreeDetails {
       'trunk_diameter': diameter,
       'canopy_coverage': coverLevel,
       'sea_level_height': seaLevel,
-      'image_url': imagePath,
+      'image_base64': imageBase64,
       'notes': note,
       'created_at': createdAt,
     };

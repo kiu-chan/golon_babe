@@ -20,11 +20,11 @@ class TreeRepository {
     return data.map((json) => TreeDetails.fromJson(json)).toList();
   }
 
-Future<TreeDetails?> getTreeDetailsById(int id) async {
-  final data = await _db.getTreeDetailsById(id);
-  if (data == null) return null;
-  return TreeDetails.fromJson(data);
-}
+  Future<TreeDetails?> getTreeDetailsById(int id) async {
+    final data = await _db.getTreeDetailsById(id);
+    if (data == null) return null;
+    return TreeDetails.fromJson(data);
+  }
 
   Future<bool> saveTreeDetails(TreeDetails details) async {
     final Map<String, dynamic> dbData = {
@@ -35,7 +35,7 @@ Future<TreeDetails?> getTreeDetailsById(int id) async {
       'trunk_diameter': details.diameter,
       'canopy_coverage': details.coverLevel,
       'sea_level_height': details.seaLevel,
-      'image_url': details.imagePath,
+      'image_base64': details.imageBase64,
       'notes': details.note,
     };
 

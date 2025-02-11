@@ -133,7 +133,7 @@ class DatabaseHelper {
         'diameter': details['trunk_diameter'],
         'coverage': details['canopy_coverage'],
         'seaLevel': details['sea_level_height'],
-        'imageBase64': details['image_url'],
+        'imageBase64': details['image_base64'],
         'notes': details['notes'],
       });
       return true;

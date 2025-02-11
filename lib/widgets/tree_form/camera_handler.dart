@@ -46,9 +46,9 @@ class _CameraHandlerState extends State<CameraHandler> {
       final XFile? photo = await _picker.pickImage(
         source: source,
         preferredCameraDevice: CameraDevice.rear,
+        maxWidth: 1024,
         maxHeight: 1024,
-        maxWidth: 768,
-        imageQuality: 70,
+        imageQuality: 85,
       );
 
       if (photo != null && mounted) {
@@ -65,14 +65,12 @@ class _CameraHandlerState extends State<CameraHandler> {
     }
   }
 
-Future<String?> _convertImageToBase64(String imagePath) async {
+  Future<String?> _convertImageToBase64(String imagePath) async {
     try {
       final File imageFile = File(imagePath);
       if (await imageFile.exists()) {
         final List<int> imageBytes = await imageFile.readAsBytes();
-        // Chỉ encode bytes thành base64, không thêm prefix
         final String base64String = base64Encode(imageBytes);
-        // Kiểm tra xem base64 có hợp lệ không
         try {
           base64Decode(base64String);
           return base64String;
@@ -108,7 +106,7 @@ Future<String?> _convertImageToBase64(String imagePath) async {
         children: [
           Container(
             width: double.infinity,
-            height: 200,
+            height: 300,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(8),
               border: Border.all(color: Colors.grey.shade300),
@@ -117,13 +115,22 @@ Future<String?> _convertImageToBase64(String imagePath) async {
               borderRadius: BorderRadius.circular(8),
               child: Image.memory(
                 imageBytes,
-                fit: BoxFit.cover,
+                fit: BoxFit.contain,
+                width: double.infinity,
+                height: 300,
                 errorBuilder: (context, error, stackTrace) {
                   print('Error loading image: $error');
                   return Center(
-                    child: Text(
-                      'Lỗi hiển thị ảnh',
-                      style: TextStyle(color: Colors.red[300]),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.broken_image, size: 48, color: Colors.red[300]),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Lỗi hiển thị ảnh',
+                          style: TextStyle(color: Colors.red[300]),
+                        ),
+                      ],
                     ),
                   );
                 },
@@ -162,9 +169,9 @@ Future<String?> _convertImageToBase64(String imagePath) async {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
+            Icon(
               Icons.broken_image,
-              color: Colors.red,
+              color: Colors.red[300],
               size: 48,
             ),
             const SizedBox(height: 8),
@@ -293,6 +300,28 @@ Future<String?> _convertImageToBase64(String imagePath) async {
         if (widget.currentImageBase64 != null && widget.currentImageBase64!.isNotEmpty) ...[
           const SizedBox(height: 16),
           _buildImagePreview(),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+            decoration: BoxDecoration(
+              color: Colors.green[50],
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.green[200]!),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.green, size: 20),
+                SizedBox(width: 8),
+                Text(
+                  'Đã chọn ảnh thành công',
+                  style: TextStyle(
+                    color: Colors.green,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ],
     );

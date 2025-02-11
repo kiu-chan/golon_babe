@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:golon_babe/models/tree_model.dart';
-import 'dart:io';
 import 'tree_form_controller.dart';
 import 'tree_form_styles.dart';
 import 'tree_form_validator.dart';
@@ -128,122 +126,6 @@ class TreeFormWidgets {
     );
   }
 
-  static Widget buildImageSection(
-    TreeFormController controller,
-    BuildContext context,
-    Function(ImageSource) onImagePicked,
-  ) {
-    return Container(
-      decoration: TreeFormStyles.cardDecoration(),
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Hình ảnh', style: TreeFormStyles.titleStyle()),
-          const SizedBox(height: 8),
-          Text(
-            'Chụp ảnh hoặc chọn ảnh từ thư viện',
-            style: TreeFormStyles.subtitleStyle(),
-          ),
-          const SizedBox(height: 20),
-          Row(
-            children: [
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () => controller.handleCameraPermission(
-                    context,
-                    onImagePicked,
-                  ),
-                  icon: const Icon(Icons.camera_alt, color: Colors.white),
-                  label: const Text('Chụp ảnh mới'),
-                  style: TreeFormStyles.elevatedButtonStyle(),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () => onImagePicked(ImageSource.gallery),
-                  icon: const Icon(Icons.photo_library, color: Colors.green),
-                  label: const Text('Chọn từ thư viện'),
-                  style: TreeFormStyles.elevatedButtonStyle(isOutlined: true),
-                ),
-              ),
-            ],
-          ),
-          if (controller.imagePath != null) ...[
-            const SizedBox(height: 16),
-            Stack(
-              children: [
-                Container(
-                  width: double.infinity,
-                  height: 200,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[100],
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.grey[300]!),
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Image.file(
-                      File(controller.imagePath!),
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                ),
-                Positioned(
-                  top: 8,
-                  right: 8,
-                  child: GestureDetector(
-                    onTap: () {
-                      controller.imagePath = null;
-                      (context as Element).markNeedsBuild();
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
-                            blurRadius: 4,
-                          ),
-                        ],
-                      ),
-                      child: const Icon(Icons.close, size: 20, color: Colors.grey),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            Container(
-              margin: const EdgeInsets.only(top: 8),
-              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-              decoration: BoxDecoration(
-                color: Colors.green[50],
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.green[200]!),
-              ),
-              child: const Row(
-                children: [
-                  Icon(Icons.check_circle, color: Colors.green, size: 20),
-                  SizedBox(width: 8),
-                  Text(
-                    'Đã chọn ảnh thành công',
-                    style: TextStyle(
-                      color: Colors.green,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
   static Widget buildDetailSection(
     TreeFormController controller,
     Widget content,
@@ -264,6 +146,170 @@ class TreeFormWidgets {
           content,
         ],
       ),
+    );
+  }
+
+  static Widget buildCoverLevelDropdown(
+    TreeFormController controller,
+    Function(String?) onChanged,
+  ) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      child: DropdownButtonFormField<String>(
+        decoration: TreeFormStyles.textFieldDecoration(
+          'Mức độ che phủ của tán cây',
+          prefixIcon: Icon(Icons.filter_hdr, color: TreeFormStyles.accentColor),
+        ),
+        value: controller.selectedCoverLevel,
+        items: TreeConstants.coverLevels.map((level) {
+          return DropdownMenuItem<String>(
+            value: level,
+            child: Text(level),
+          );
+        }).toList(),
+        onChanged: onChanged,
+      ),
+    );
+  }
+
+  static Widget buildSubmitButton(
+    TreeFormController controller,
+    VoidCallback onPressed,
+  ) {
+    return ElevatedButton(
+      onPressed: onPressed,
+      style: TreeFormStyles.submitButtonStyle(),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            controller.isEditing ? Icons.update : Icons.add_circle,
+            size: 24,
+            color: Colors.white,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            controller.isEditing ? 'Cập nhật thông tin' : 'Thêm mới',
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static Widget buildDetailFields(TreeFormController controller) {
+    return Column(
+      children: [
+        buildTextField(
+          controller: controller.tayNameController,
+          label: 'Tên tiếng Tày',
+          enabled: false,
+          prefixIcon: Icons.translate,
+        ),
+        buildTextField(
+          controller: controller.scientificNameController,
+          label: 'Tên khoa học',
+          enabled: false,
+          prefixIcon: Icons.science,
+        ),
+        buildTextField(
+          controller: controller.branchController,
+          label: 'Ngành',
+          enabled: false,
+          prefixIcon: Icons.account_tree,
+        ),
+        buildTextField(
+          controller: controller.treeClassController,
+          label: 'Lớp',
+          enabled: false,
+          prefixIcon: Icons.category,
+        ),
+        buildTextField(
+          controller: controller.divisionController,
+          label: 'Bộ',
+          enabled: false,
+          prefixIcon: Icons.folder_outlined,
+        ),
+        buildTextField(
+          controller: controller.familyController,
+          label: 'Họ',
+          enabled: false,
+          prefixIcon: Icons.family_restroom,
+        ),
+        buildTextField(
+          controller: controller.genusController,
+          label: 'Chi',
+          enabled: false,
+          prefixIcon: Icons.eco,
+        ),
+        buildTextField(
+          controller: controller.coordinateXController,
+          label: 'Tọa độ x',
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          prefixIcon: Icons.location_on,
+          validator: (value) {
+            if (!TreeFormValidator.validateCoordinate(value)) {
+              return 'Vui lòng nhập số thập phân hợp lệ (tối đa 6 chữ số sau dấu phẩy)';
+            }
+            return null;
+          },
+        ),
+        buildTextField(
+          controller: controller.coordinateYController,
+          label: 'Tọa độ y',
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          prefixIcon: Icons.location_on,
+          validator: (value) {
+            if (!TreeFormValidator.validateCoordinate(value)) {
+              return 'Vui lòng nhập số thập phân hợp lệ (tối đa 6 chữ số sau dấu phẩy)';
+            }
+            return null;
+          },
+        ),
+        buildTextField(
+          controller: controller.heightController,
+          label: 'Chiều cao cây (m)',
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          prefixIcon: Icons.height,
+          validator: (value) {
+            if (!TreeFormValidator.validateHeight(value)) {
+              return 'Vui lòng nhập số dương từ 0 đến 999.99m (tối đa 2 chữ số sau dấu phẩy)';
+            }
+            return null;
+          },
+        ),
+        buildTextField(
+          controller: controller.diameterController,
+          label: 'Đường kính thân cây (cm)',
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          prefixIcon: Icons.straighten,
+          validator: (value) {
+            if (!TreeFormValidator.validateDiameter(value)) {
+              return 'Vui lòng nhập số dương từ 0 đến 9999.99cm (tối đa 2 chữ số sau dấu phẩy)';
+            }
+            return null;
+          },
+        ),
+        buildCoverLevelDropdown(
+          controller,
+          (value) => controller.selectedCoverLevel = value,
+        ),
+        buildTextField(
+          controller: controller.seaLevelController,
+          label: 'Độ cao so với mực nước biển (m)',
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          prefixIcon: Icons.terrain,
+          validator: (value) {
+            if (!TreeFormValidator.validateSeaLevel(value)) {
+              return 'Vui lòng nhập số từ -99999.99 đến 99999.99m (tối đa 2 chữ số sau dấu phẩy)';
+            }
+            return null;
+          },
+        ),
+      ],
     );
   }
 }

@@ -24,7 +24,7 @@ class TreeFormController {
 
   MasterTreeInfo? selectedTree;
   String? selectedCoverLevel;
-  String? imagePath;
+  String? imageBase64;
   bool isEditing = false;
   int? editingId;
 
@@ -87,7 +87,7 @@ class TreeFormController {
         selectedCoverLevel = tree.coverLevel;
         seaLevelController.text = tree.seaLevel?.toString() ?? '';
         noteController.text = tree.note ?? '';
-        imagePath = tree.imagePath;
+        imageBase64 = tree.imageBase64;
         
         if (tree.masterInfo != null) {
           selectedTree = tree.masterInfo;
@@ -115,90 +115,9 @@ class TreeFormController {
     selectedCoverLevel = null;
     seaLevelController.clear();
     noteController.clear();
-    imagePath = null;
+    imageBase64 = null;
     selectedTree = null;
     updateTreeInfo(null);
-  }
-
-  Future<void> handleCameraPermission(BuildContext context, Function(ImageSource) onImagePicked) async {
-    final status = await Permission.camera.status;
-    
-    if (status.isDenied) {
-      if (!context.mounted) return;
-      showDialog(
-        context: context,
-        builder: (BuildContext context) => AlertDialog(
-          title: const Text('Cấp quyền truy cập máy ảnh'),
-          content: const Text('Ứng dụng cần quyền truy cập máy ảnh để chụp ảnh cây'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Không'),
-            ),
-            TextButton(
-              onPressed: () async {
-                Navigator.pop(context);
-                final result = await Permission.camera.request();
-                if (result.isGranted) {
-                  onImagePicked(ImageSource.camera);
-                }
-              },
-              child: const Text('Đồng ý'),
-            ),
-          ],
-        ),
-      );
-    } else if (status.isPermanentlyDenied) {
-      if (!context.mounted) return;
-      showDialog(
-        context: context,
-        builder: (BuildContext context) => AlertDialog(
-          title: const Text('Quyền truy cập máy ảnh bị từ chối'),
-          content: const Text('Vui lòng vào Cài đặt để cấp quyền cho ứng dụng'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Để sau'),
-            ),
-            TextButton(
-              onPressed: () {
-                openAppSettings();
-                Navigator.pop(context);
-              },
-              child: const Text('Mở Cài đặt'),
-            ),
-          ],
-        ),
-      );
-    } else if (status.isGranted) {
-      onImagePicked(ImageSource.camera);
-    }
-  }
-
-  Future<void> pickImage(ImageSource source, BuildContext context) async {
-    try {
-      final ImagePicker picker = ImagePicker();
-      final XFile? image = await picker.pickImage(
-        source: source,
-        imageQuality: 85,
-        maxWidth: 1920,
-        maxHeight: 1080,
-        preferredCameraDevice: CameraDevice.rear,
-      );
-      
-      if (image != null) {
-        imagePath = image.path;
-      }
-    } catch (e) {
-      if (!context.mounted) return;
-      String errorMessage = 'Không thể mở máy ảnh';
-      if (e.toString().contains('permission')) {
-        errorMessage = 'Vui lòng cấp quyền truy cập máy ảnh trong cài đặt';
-      }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(errorMessage)),
-      );
-    }
   }
 
   Future<void> handleSubmit(Function(TreeDetails) onSubmit) async {
@@ -212,7 +131,7 @@ class TreeFormController {
         diameter: TreeFormValidator.parseNumber(diameterController.text),
         coverLevel: selectedCoverLevel,
         seaLevel: TreeFormValidator.parseNumber(seaLevelController.text),
-        imagePath: imagePath,
+        imageBase64: imageBase64,
         note: noteController.text,
       );
 
