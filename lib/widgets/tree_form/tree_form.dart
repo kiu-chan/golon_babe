@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:golon_babe/models/tree_model.dart';
 import 'package:golon_babe/repositories/tree_repository.dart';
-import 'package:image_picker/image_picker.dart';
 import 'tree_form_controller.dart';
 import 'tree_form_widgets.dart';
 import 'tree_form_styles.dart';
 import 'tree_form_validator.dart';
+import 'camera_handler.dart';
 
 class TreeForm extends StatefulWidget {
  final List<MasterTreeInfo> masterTreeList;
@@ -54,14 +54,14 @@ class _TreeFormState extends State<TreeForm> {
        ),
        TreeFormWidgets.buildTextField(
          controller: _controller.scientificNameController,
-         label: 'Tên khoa học',
+         label: 'Tên khoa học', 
          enabled: false,
          prefixIcon: Icons.science,
        ),
        TreeFormWidgets.buildTextField(
          controller: _controller.branchController,
          label: 'Ngành',
-         enabled: false,
+         enabled: false, 
          prefixIcon: Icons.account_tree,
        ),
        TreeFormWidgets.buildTextField(
@@ -216,13 +216,29 @@ class _TreeFormState extends State<TreeForm> {
            ),
            const SizedBox(height: 24),
 
-           TreeFormWidgets.buildImageSection(
-             _controller,
-             context,
-             (source) async {
-               final result = await _controller.pickImage(source, context);
-               setState(() {});
-             },
+           Container(
+             decoration: TreeFormStyles.cardDecoration(),
+             padding: const EdgeInsets.all(20),
+             child: Column(
+               crossAxisAlignment: CrossAxisAlignment.start,
+               children: [
+                 Text('Hình ảnh', style: TreeFormStyles.titleStyle()),
+                 const SizedBox(height: 8),
+                 Text(
+                   'Chụp ảnh hoặc chọn ảnh từ thư viện',
+                   style: TreeFormStyles.subtitleStyle(),
+                 ),
+                 const SizedBox(height: 20),
+                 CameraHandler(
+                   currentImageBase64: _controller.imagePath,
+                   onImageSelected: (String base64String) {
+                     setState(() {
+                       _controller.imagePath = base64String.isNotEmpty ? base64String : null;
+                     });
+                   },
+                 ),
+               ],
+             ),
            ),
            const SizedBox(height: 24),
 
@@ -258,7 +274,8 @@ class _TreeFormState extends State<TreeForm> {
                children: [
                  Icon(
                    _controller.isEditing ? Icons.update : Icons.add_circle,
-                   size: 24, color: Colors.white,
+                   size: 24,
+                   color: Colors.white,
                  ),
                  const SizedBox(width: 8),
                  Text(

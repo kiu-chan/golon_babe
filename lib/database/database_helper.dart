@@ -54,23 +54,22 @@ class DatabaseHelper {
     }).toList();
   }
 
-// Sửa kiểu dữ liệu của id từ String sang int
-Future<Map<String, dynamic>?> getTreeDetailsById(int id) async {
-  final conn = await connection;
-  final results = await conn.mappedResultsQuery('''
-    SELECT td.*, mti.tree_type, mti.scientific_name, mti.tay_name,
-           mti.branch, mti.class, mti.division, mti.family, mti.genus
-    FROM tree_details td
-    JOIN master_tree_info mti ON td.master_tree_id = mti.id
-    WHERE td.id = @id
-  ''', substitutionValues: {'id': id});
-  
-  if (results.isEmpty) return null;
-  return {
-    ...results.first['tree_details']!,
-    ...results.first['master_tree_info']!,
-  };
-}
+  Future<Map<String, dynamic>?> getTreeDetailsById(int id) async {
+    final conn = await connection;
+    final results = await conn.mappedResultsQuery('''
+      SELECT td.*, mti.tree_type, mti.scientific_name, mti.tay_name,
+             mti.branch, mti.class, mti.division, mti.family, mti.genus
+      FROM tree_details td
+      JOIN master_tree_info mti ON td.master_tree_id = mti.id
+      WHERE td.id = @id
+    ''', substitutionValues: {'id': id});
+    
+    if (results.isEmpty) return null;
+    return {
+      ...results.first['tree_details']!,
+      ...results.first['master_tree_info']!,
+    };
+  }
 
   Future<bool> insertTreeDetail({
     required int masterTreeId,
@@ -82,11 +81,11 @@ Future<Map<String, dynamic>?> getTreeDetailsById(int id) async {
         INSERT INTO tree_details (
           master_tree_id, coordinate_x, coordinate_y, height,
           trunk_diameter, canopy_coverage, sea_level_height,
-          image_url, notes
+          image_base64, notes, created_at
         ) VALUES (
           @masterTreeId, @coordX, @coordY, @height,
           @diameter, @coverage, @seaLevel,
-          @imageUrl, @notes
+          @imageBase64, @notes, CURRENT_TIMESTAMP
         )
       ''', substitutionValues: {
         'masterTreeId': masterTreeId,
@@ -96,7 +95,7 @@ Future<Map<String, dynamic>?> getTreeDetailsById(int id) async {
         'diameter': details['trunk_diameter'],
         'coverage': details['canopy_coverage'],
         'seaLevel': details['sea_level_height'],
-        'imageUrl': details['image_url'],
+        'imageBase64': details['image_base64'],
         'notes': details['notes'],
       });
       return true;
@@ -121,8 +120,9 @@ Future<Map<String, dynamic>?> getTreeDetailsById(int id) async {
             trunk_diameter = @diameter,
             canopy_coverage = @coverage,
             sea_level_height = @seaLevel,
-            image_url = @imageUrl,
-            notes = @notes
+            image_base64 = @imageBase64,
+            notes = @notes,
+            updated_at = CURRENT_TIMESTAMP
         WHERE id = @id
       ''', substitutionValues: {
         'id': id,
@@ -133,12 +133,26 @@ Future<Map<String, dynamic>?> getTreeDetailsById(int id) async {
         'diameter': details['trunk_diameter'],
         'coverage': details['canopy_coverage'],
         'seaLevel': details['sea_level_height'],
-        'imageUrl': details['image_url'],
+        'imageBase64': details['image_url'],
         'notes': details['notes'],
       });
       return true;
     } catch (e) {
       print('Error updating tree detail: $e');
+      return false;
+    }
+  }
+
+  Future<bool> deleteTreeDetail(int id) async {
+    try {
+      final conn = await connection;
+      await conn.execute(
+        'DELETE FROM tree_details WHERE id = @id',
+        substitutionValues: {'id': id},
+      );
+      return true;
+    } catch (e) {
+      print('Error deleting tree detail: $e');
       return false;
     }
   }

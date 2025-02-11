@@ -70,43 +70,40 @@ class TreeFormController {
     }
   }
 
-Future<bool> searchTreeById(String id) async {
-  try {
-    // Chuyển đổi id từ String sang int
-    final idNumber = int.tryParse(id);
-    if (idNumber == null) return false;
-    
-    final tree = await _repository.getTreeDetailsById(idNumber);
-    if (tree != null) {
-      isEditing = true;
-      editingId = tree.id;
+  Future<bool> searchTreeById(String id) async {
+    try {
+      final idNumber = int.tryParse(id);
+      if (idNumber == null) return false;
       
-      // Cập nhật các controller với dữ liệu hiện có
-      coordinateXController.text = tree.coordinateX?.toString() ?? '';
-      coordinateYController.text = tree.coordinateY?.toString() ?? '';
-      heightController.text = tree.height?.toString() ?? '';
-      diameterController.text = tree.diameter?.toString() ?? '';
-      selectedCoverLevel = tree.coverLevel;
-      seaLevelController.text = tree.seaLevel?.toString() ?? '';
-      noteController.text = tree.note ?? '';
-      imagePath = tree.imagePath;
-      
-      // Cập nhật thông tin cây gốc
-      if (tree.masterInfo != null) {
-        selectedTree = tree.masterInfo;
-        updateTreeInfo(tree.masterInfo);
+      final tree = await _repository.getTreeDetailsById(idNumber);
+      if (tree != null) {
+        isEditing = true;
+        editingId = tree.id;
+        
+        coordinateXController.text = tree.coordinateX?.toString() ?? '';
+        coordinateYController.text = tree.coordinateY?.toString() ?? '';
+        heightController.text = tree.height?.toString() ?? '';
+        diameterController.text = tree.diameter?.toString() ?? '';
+        selectedCoverLevel = tree.coverLevel;
+        seaLevelController.text = tree.seaLevel?.toString() ?? '';
+        noteController.text = tree.note ?? '';
+        imagePath = tree.imagePath;
+        
+        if (tree.masterInfo != null) {
+          selectedTree = tree.masterInfo;
+          updateTreeInfo(tree.masterInfo);
+        }
+        return true;
+      } else {
+        resetForm();
+        return false;
       }
-      return true;
-    } else {
+    } catch (e) {
+      print('Error searching tree: $e');
       resetForm();
       return false;
     }
-  } catch (e) {
-    print('Error searching tree: $e');
-    resetForm();
-    return false;
   }
-}
 
   void resetForm() {
     isEditing = false;
@@ -123,8 +120,9 @@ Future<bool> searchTreeById(String id) async {
     updateTreeInfo(null);
   }
 
-  Future<void> handleCameraPermission(BuildContext context, Function(ImageSource) pickImage) async {
+  Future<void> handleCameraPermission(BuildContext context, Function(ImageSource) onImagePicked) async {
     final status = await Permission.camera.status;
+    
     if (status.isDenied) {
       if (!context.mounted) return;
       showDialog(
@@ -142,7 +140,7 @@ Future<bool> searchTreeById(String id) async {
                 Navigator.pop(context);
                 final result = await Permission.camera.request();
                 if (result.isGranted) {
-                  pickImage(ImageSource.camera);
+                  onImagePicked(ImageSource.camera);
                 }
               },
               child: const Text('Đồng ý'),
@@ -173,18 +171,19 @@ Future<bool> searchTreeById(String id) async {
         ),
       );
     } else if (status.isGranted) {
-      pickImage(ImageSource.camera);
+      onImagePicked(ImageSource.camera);
     }
   }
 
-Future<void> pickImage(ImageSource source, BuildContext context) async {
+  Future<void> pickImage(ImageSource source, BuildContext context) async {
     try {
       final ImagePicker picker = ImagePicker();
       final XFile? image = await picker.pickImage(
         source: source,
-        imageQuality: 85, // Giảm chất lượng ảnh để tối ưu bộ nhớ
-        maxWidth: 1024, // Giới hạn chiều rộng tối đa
-        maxHeight: 1024, // Giới hạn chiều cao tối đa
+        imageQuality: 85,
+        maxWidth: 1920,
+        maxHeight: 1080,
+        preferredCameraDevice: CameraDevice.rear,
       );
       
       if (image != null) {
@@ -219,7 +218,6 @@ Future<void> pickImage(ImageSource source, BuildContext context) async {
 
       onSubmit(details);
       
-      // Reset form sau khi submit
       formKey.currentState!.reset();
       resetForm();
     }
