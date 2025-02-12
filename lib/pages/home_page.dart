@@ -103,41 +103,39 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<void> _initialDataLoad() async {
-    try {
-      final lastSync = _prefs?.getString('last_sync_date');
-      final hasLocalData = await _repository.hasLocalData();
-
-      print('\n=== KHỞI TẠO DỮ LIỆU ỨNG DỤNG ===');
-      
-      if (!hasLocalData || lastSync == null) {
-        if (_isOnline) {
-          print('Chưa có dữ liệu local - Tải dữ liệu lần đầu');
-          _showFirstTimeDataDialog();
-        } else {
-          print('Không có dữ liệu offline và không có kết nối mạng');
-          await _loadOfflineData();
-        }
-      } else {
-        final lastSyncDate = DateTime.parse(lastSync);
-        final now = DateTime.now();
-        if (_isOnline && now.difference(lastSyncDate).inHours >= 1) {
-          print('Dữ liệu đã cũ hơn 1 giờ - Đề xuất cập nhật');
-          _showUpdateDataDialog();
-        } else {
-          print('Dữ liệu còn mới - Tải từ local');
-          await _loadMasterTreeInfo();
-        }
-      }
-      
-      await _repository.printSavedData();
-      
-    } catch (e) {
-      print('Lỗi tải dữ liệu ban đầu: $e');
-      _handleError('Không thể tải dữ liệu ban đầu');
+Future<void> _initialDataLoad() async {
+  try {
+    print('\n=== KHỞI TẠO DỮ LIỆU ỨNG DỤNG ===');
+    
+    // Kiểm tra dữ liệu local trước
+    final hasLocalData = await _repository.hasLocalData();
+    
+    if (hasLocalData) {
+      print('Đã có dữ liệu local - Tải dữ liệu từ local...');
       await _loadOfflineData();
+      
+      // Nếu có mạng thì đồng bộ ngầm
+      if (_isOnline) {
+        _syncData();
+      }
+    } else {
+      if (_isOnline) {
+        print('Chưa có dữ liệu local - Tải dữ liệu lần đầu');
+        _showFirstTimeDataDialog();
+      } else {
+        print('Không có dữ liệu offline và không có kết nối mạng');
+        await _loadOfflineData();
+      }
     }
+    
+    await _repository.printSavedData();
+    
+  } catch (e) {
+    print('Lỗi tải dữ liệu ban đầu: $e');
+    _handleError('Không thể tải dữ liệu ban đầu');
+    await _loadOfflineData();
   }
+}
 
   Future<bool> _shouldSyncData() async {
     if (_prefs == null) return true;

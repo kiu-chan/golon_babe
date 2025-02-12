@@ -83,49 +83,55 @@ class SQLiteHelper {
   }
 
   // CRUD cho master_tree_info
-  Future<void> insertMasterTreeInfo(List<Map<String, dynamic>> trees) async {
+Future<void> insertMasterTreeInfo(List<Map<String, dynamic>> trees) async {
+  final db = await database;
+  await db.transaction((txn) async {
     try {
-      final db = await database;
-      await db.transaction((txn) async {
-        print('Bắt đầu thêm ${trees.length} master trees...');
-        
-        // Xóa dữ liệu cũ
-        await txn.delete('master_tree_info');
-        
-        // Thêm từng cây mới
-        for (var tree in trees) {
-          await txn.insert(
-            'master_tree_info',
-            {
-              'id': tree['id'],
-              'tree_type': tree['tree_type'],
-              'scientific_name': tree['scientific_name'],
-              'tay_name': tree['tay_name'],
-              'branch': tree['branch'],
-              'class': tree['class'],
-              'division': tree['division'],
-              'family': tree['family'],
-              'genus': tree['genus'],
-              'updated_at': DateTime.now().toIso8601String(),
-            },
-            conflictAlgorithm: ConflictAlgorithm.replace,
-          );
-        }
-        
-        print('Đã thêm thành công ${trees.length} master trees');
-
-        // Kiểm tra số lượng sau khi thêm
-        final count = Sqflite.firstIntValue(
-          await txn.rawQuery('SELECT COUNT(*) FROM master_tree_info')
+      print('Bắt đầu thêm ${trees.length} master trees...');
+      
+      // KHÔNG xóa dữ liệu cũ nếu danh sách mới trống
+      if (trees.isEmpty) {
+        print('Danh sách master trees trống, giữ lại dữ liệu cũ');
+        return;
+      }
+      
+      // Xóa dữ liệu cũ chỉ khi có dữ liệu mới
+      await txn.delete('master_tree_info');
+      print('Đã xóa dữ liệu master trees cũ');
+      
+      // Thêm từng cây mới
+      for (var tree in trees) {
+        await txn.insert(
+          'master_tree_info',
+          {
+            'id': tree['id'],
+            'tree_type': tree['tree_type'],
+            'scientific_name': tree['scientific_name'],
+            'tay_name': tree['tay_name'],
+            'branch': tree['branch'],
+            'class': tree['class'],
+            'division': tree['division'], 
+            'family': tree['family'],
+            'genus': tree['genus'],
+            'updated_at': DateTime.now().toIso8601String(),
+          },
+          conflictAlgorithm: ConflictAlgorithm.replace,
         );
-        print('Số lượng master trees sau khi thêm: $count');
-      });
+      }
+      
+      // Kiểm tra số lượng sau khi thêm
+      final count = Sqflite.firstIntValue(
+        await txn.rawQuery('SELECT COUNT(*) FROM master_tree_info')
+      );
+      print('Số lượng master trees sau khi thêm: $count');
+      
     } catch (e) {
       print('Lỗi khi thêm master trees: $e');
       print('Stack trace: ${StackTrace.current}');
       throw e;
     }
-  }
+  });
+}
 
   Future<List<Map<String, dynamic>>> getAllMasterTreeInfo() async {
     try {
@@ -167,35 +173,39 @@ class SQLiteHelper {
   Future<int> insertTreeDetail(Map<String, dynamic> detail) async {
     try {
       final db = await database;
-      print('Đang thêm chi tiết cây mới...');
+      int id = 0;
+      
+      await db.transaction((txn) async {
+        print('Đang thêm chi tiết cây mới...');
 
-      // Xử lý ảnh base64
-      String? imageBase64 = detail['image_base64'];
-      if (imageBase64 != null && imageBase64.contains(',')) {
-        imageBase64 = imageBase64.split(',')[1];
-      }
+        // Xử lý ảnh base64
+        String? imageBase64 = detail['image_base64'];
+        if (imageBase64 != null && imageBase64.contains(',')) {
+          imageBase64 = imageBase64.split(',')[1];
+        }
 
-      final insertData = {
-        if (detail['id'] != null) 'id': detail['id'],
-        'master_tree_id': detail['master_tree_id'],
-        'coordinate_x': detail['coordinate_x'],
-        'coordinate_y': detail['coordinate_y'],
-        'height': detail['height'],
-        'trunk_diameter': detail['trunk_diameter'],
-        'canopy_coverage': detail['canopy_coverage'],
-        'sea_level_height': detail['sea_level_height'],
-        'image_base64': imageBase64,
-        'notes': detail['notes'],
-        'created_at': DateTime.now().toIso8601String(),
-        'updated_at': DateTime.now().toIso8601String(),
-        'sync_status': detail['sync_status'] ?? 'pending',
-      };
+        final insertData = {
+          if (detail['id'] != null) 'id': detail['id'],
+          'master_tree_id': detail['master_tree_id'],
+          'coordinate_x': detail['coordinate_x'],
+          'coordinate_y': detail['coordinate_y'],
+          'height': detail['height'],
+          'trunk_diameter': detail['trunk_diameter'],
+          'canopy_coverage': detail['canopy_coverage'],
+          'sea_level_height': detail['sea_level_height'],
+          'image_base64': imageBase64,
+          'notes': detail['notes'],
+          'created_at': DateTime.now().toIso8601String(),
+          'updated_at': DateTime.now().toIso8601String(),
+          'sync_status': detail['sync_status'] ?? 'pending',
+        };
 
-      final id = await db.insert(
-        'tree_details',
-        insertData,
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
+        id = await txn.insert(
+          'tree_details',
+          insertData,
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+      });
 
       print('Đã thêm chi tiết cây với ID: $id');
       return id;
@@ -209,38 +219,42 @@ class SQLiteHelper {
   Future<bool> updateTreeDetail(int id, Map<String, dynamic> detail) async {
     try {
       final db = await database;
+      int count = 0;
       
-      // Xử lý ảnh base64
-      String? imageBase64 = detail['image_base64'];
-      if (imageBase64 != null && imageBase64.contains(',')) {
-        imageBase64 = imageBase64.split(',')[1];
-      }
+      await db.transaction((txn) async {
+        // Xử lý ảnh base64
+        String? imageBase64 = detail['image_base64'];
+        if (imageBase64 != null && imageBase64.contains(',')) {
+          imageBase64 = imageBase64.split(',')[1];
+        }
 
-      final updateData = {
-        'master_tree_id': detail['master_tree_id'],
-        'coordinate_x': detail['coordinate_x'],
-        'coordinate_y': detail['coordinate_y'],
-        'height': detail['height'],
-        'trunk_diameter': detail['trunk_diameter'],
-        'canopy_coverage': detail['canopy_coverage'],
-        'sea_level_height': detail['sea_level_height'],
-        'image_base64': imageBase64,
-        'notes': detail['notes'],
-        'updated_at': DateTime.now().toIso8601String(),
-        'sync_status': detail['sync_status'] ?? 'pending',
-      };
+        final updateData = {
+          'master_tree_id': detail['master_tree_id'],
+          'coordinate_x': detail['coordinate_x'],
+          'coordinate_y': detail['coordinate_y'],
+          'height': detail['height'],
+          'trunk_diameter': detail['trunk_diameter'],
+          'canopy_coverage': detail['canopy_coverage'],
+          'sea_level_height': detail['sea_level_height'],
+          'image_base64': imageBase64,
+          'notes': detail['notes'],
+          'updated_at': DateTime.now().toIso8601String(),
+          'sync_status': detail['sync_status'] ?? 'pending',
+        };
 
-      final count = await db.update(
-        'tree_details',
-        updateData,
-        where: 'id = ?',
-        whereArgs: [id],
-      );
+        count = await txn.update(
+          'tree_details',
+          updateData,
+          where: 'id = ?',
+          whereArgs: [id],
+        );
+      });
 
       print('Đã cập nhật chi tiết cây ID $id: ${count > 0 ? "thành công" : "thất bại"}');
       return count > 0;
     } catch (e) {
       print('Lỗi khi cập nhật chi tiết cây: $e');
+      print('Stack trace: ${StackTrace.current}');
       return false;
     }
   }
@@ -257,12 +271,12 @@ class SQLiteHelper {
       ''', [id]);
 
       if (results.isEmpty) {
-        print('Không tìm thấy chi tiết cây ID $id');
+        print('Không tìm thấy chi tiết cây ID $id trong local database');
         return null;
       }
 
       final row = results.first;
-      print('Đã tìm thấy chi tiết cây ID $id');
+      print('Đã tìm thấy chi tiết cây ID $id trong local');
 
       // Tạo đối tượng MasterTreeInfo
       final masterInfo = MasterTreeInfo(
@@ -400,6 +414,21 @@ class SQLiteHelper {
     }
   }
 
+  Future<void> clearSyncedTreeDetails() async {
+    try {
+      final db = await database;
+      await db.delete(
+        'tree_details',
+        where: 'sync_status = ?',
+        whereArgs: ['synced']
+      );
+      print('Đã xóa các chi tiết cây đã đồng bộ');
+    } catch (e) {
+      print('Lỗi khi xóa chi tiết cây đã đồng bộ: $e');
+      throw e;
+    }
+  }
+
   // Utility methods
   Future<bool> hasData() async {
     try {
@@ -504,7 +533,7 @@ class SQLiteHelper {
       print('\nCấu trúc bảng master_tree_info:');
       print(masterInfo.first['sql']);
       
-      // In thông tin bảng tree_details
+      // In thông tin bảng tree_details  
       final detailsInfo = await db.rawQuery('''
         SELECT sql FROM sqlite_master 
         WHERE type='table' AND name='tree_details'
@@ -545,4 +574,4 @@ class SQLiteHelper {
       print('Đã đóng kết nối database');
     }
   }
-}
+  }
