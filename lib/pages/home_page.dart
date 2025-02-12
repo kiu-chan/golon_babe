@@ -29,23 +29,23 @@ class _HomePageState extends State<HomePage> {
     _initializeApp();
   }
 
-Future<void> _initializeApp() async {
-  try {
-    await _initPrefs();
-    await _setupConnectivity();
-    await _initialDataLoad();
-  } catch (e) {
-    print('Lỗi khởi tạo ứng dụng: $e');
-    _handleError('Lỗi khởi tạo ứng dụng');
-  } finally {
-    if (mounted) {
-      setState(() {
-        _isInitialized = true;
-        _isLoading = false;
-      });
+  Future<void> _initializeApp() async {
+    try {
+      await _initPrefs();
+      await _setupConnectivity();
+      await _initialDataLoad();
+    } catch (e) {
+      print('Lỗi khởi tạo ứng dụng: $e');
+      _handleError('Lỗi khởi tạo ứng dụng');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isInitialized = true;
+          _isLoading = false;
+        });
+      }
     }
   }
-}
 
   Future<void> _initPrefs() async {
     try {
@@ -56,51 +56,39 @@ Future<void> _initializeApp() async {
     }
   }
 
-Future<void> _setupConnectivity() async {
-  try {
-    final connectivity = Connectivity();
-    
-    // Kiểm tra kết nối ban đầu
-    final connectivityResult = await connectivity.checkConnectivity();
-    _isOnline = connectivityResult != ConnectivityResult.none;
+  Future<void> _setupConnectivity() async {
+    try {
+      final connectivity = Connectivity();
+      final connectivityResult = await connectivity.checkConnectivity();
+      _isOnline = connectivityResult != ConnectivityResult.none;
 
-    // Thiết lập lắng nghe thay đổi kết nối
-    _connectivitySubscription = Connectivity().onConnectivityChanged.listen((dynamic connectivityResult) async {
-      if (!mounted) return;
+      _connectivitySubscription = connectivity.onConnectivityChanged.listen((dynamic result) async {
+        if (!mounted) return;
 
-      final result = connectivityResult is List<ConnectivityResult> 
-          ? connectivityResult.first 
-          : connectivityResult as ConnectivityResult;
-      
-      final hasConnection = result != ConnectivityResult.none;
-      final wasOnline = _isOnline;
-      
-      setState(() => _isOnline = hasConnection);
+        final connectivityResult = result is List<ConnectivityResult> 
+            ? result.first 
+            : result as ConnectivityResult;
+        
+        final hasConnection = connectivityResult != ConnectivityResult.none;
+        final wasOnline = _isOnline;
+        
+        setState(() => _isOnline = hasConnection);
 
-      if (hasConnection != wasOnline) {
-        if (hasConnection) {
-          _showConnectionStatusSnackBar('Đã kết nối mạng', Colors.green);
-          await _handleOnlineConnection();
-        } else {
-          _showConnectionStatusSnackBar('Đang sử dụng dữ liệu offline', Colors.orange);
-          await _loadOfflineData();
+        if (hasConnection != wasOnline) {
+          if (hasConnection) {
+            _showConnectionStatusSnackBar('Đã kết nối mạng', Colors.green);
+            await _handleOnlineConnection();
+          } else {
+            _showConnectionStatusSnackBar('Đang sử dụng dữ liệu offline', Colors.orange);
+            await _loadOfflineData();
+          }
         }
-      }
-    });
-
-  } catch (e) {
-    print('Lỗi thiết lập kết nối: $e');
-    _isOnline = false;
-  } finally {
-    // Đảm bảo tắt loading sau khi xử lý xong kết nối
-    if (mounted) {
-      setState(() {
-        _isInitialized = true;
-        _isLoading = false;
       });
+    } catch (e) {
+      print('Lỗi thiết lập kết nối: $e');
+      _isOnline = false;
     }
   }
-}
 
   Future<void> _handleOnlineConnection() async {
     try {
@@ -115,52 +103,41 @@ Future<void> _setupConnectivity() async {
     }
   }
 
-Future<void> _initialDataLoad() async {
-  try {
-    final lastSync = _prefs?.getString('last_sync_date');
-    final hasLocalData = await _repository.hasLocalData();
+  Future<void> _initialDataLoad() async {
+    try {
+      final lastSync = _prefs?.getString('last_sync_date');
+      final hasLocalData = await _repository.hasLocalData();
 
-    print('\n=== KHỞI TẠO DỮ LIỆU ỨNG DỤNG ===');
-    
-    if (!hasLocalData || lastSync == null) {
-      if (_isOnline) {
-        print('Chưa có dữ liệu local - Tải dữ liệu lần đầu');
-        _showFirstTimeDataDialog();
+      print('\n=== KHỞI TẠO DỮ LIỆU ỨNG DỤNG ===');
+      
+      if (!hasLocalData || lastSync == null) {
+        if (_isOnline) {
+          print('Chưa có dữ liệu local - Tải dữ liệu lần đầu');
+          _showFirstTimeDataDialog();
+        } else {
+          print('Không có dữ liệu offline và không có kết nối mạng');
+          await _loadOfflineData();
+        }
       } else {
-        print('Không có dữ liệu offline và không có kết nối mạng');
-        _handleError('Không có dữ liệu offline và không có kết nối mạng');
-        await _loadOfflineData();
+        final lastSyncDate = DateTime.parse(lastSync);
+        final now = DateTime.now();
+        if (_isOnline && now.difference(lastSyncDate).inHours >= 1) {
+          print('Dữ liệu đã cũ hơn 1 giờ - Đề xuất cập nhật');
+          _showUpdateDataDialog();
+        } else {
+          print('Dữ liệu còn mới - Tải từ local');
+          await _loadMasterTreeInfo();
+        }
       }
-    } else {
-      final lastSyncDate = DateTime.parse(lastSync);
-      final now = DateTime.now();
-      if (_isOnline && now.difference(lastSyncDate).inHours >= 1) {
-        print('Dữ liệu đã cũ hơn 1 giờ - Đề xuất cập nhật');
-        _showUpdateDataDialog();
-      } else {
-        print('Dữ liệu còn mới - Tải từ local');
-        await _loadMasterTreeInfo();
-      }
-    }
-    
-    // In thông tin dữ liệu đã lưu
-    await _repository.printSavedData();
-    
-    print('=== HOÀN THÀNH KHỞI TẠO DỮ LIỆU ===\n');
-    
-  } catch (e) {
-    print('Lỗi tải dữ liệu ban đầu: $e');
-    _handleError('Không thể tải dữ liệu ban đầu');
-    await _loadOfflineData();
-  } finally {
-    if (mounted) {
-      setState(() {
-        _isInitialized = true;
-        _isLoading = false;
-      });
+      
+      await _repository.printSavedData();
+      
+    } catch (e) {
+      print('Lỗi tải dữ liệu ban đầu: $e');
+      _handleError('Không thể tải dữ liệu ban đầu');
+      await _loadOfflineData();
     }
   }
-}
 
   Future<bool> _shouldSyncData() async {
     if (_prefs == null) return true;
@@ -256,64 +233,66 @@ Future<void> _initialDataLoad() async {
     }
   }
 
-Future<void> _loadOfflineData() async {
-  if (_isLoading) return;
-  setState(() => _isLoading = true);
+  Future<void> _loadOfflineData() async {
+    if (_isLoading) return;
+    setState(() => _isLoading = true);
 
-  try {
-    print('Đang tải dữ liệu offline...');
-    final localData = await _repository.getLocalMasterTreeInfo();
-    
-    // Thêm dòng này để in dữ liệu đã lưu
-    await _repository.printSavedData();
-    
-    if (mounted) {
-      setState(() {
-        _masterTreeList = localData;
-        _isLoading = false;
-        _isInitialized = true;
-      });
-    }
-  } catch (e) {
-    print('Lỗi khi tải dữ liệu offline: $e');
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
-        _isInitialized = true;
-      });
-      _handleError('Không thể tải dữ liệu offline');
-    }
-  }
-}
-
-Future<void> _loadMasterTreeInfo() async {
-  if (_isLoading) return;
-  setState(() => _isLoading = true);
-
-  try {
-    if (_isOnline) {
-      print('Đang tải dữ liệu online...');
+    try {
+      print('Đang tải dữ liệu offline...');
+      final localData = await _repository.getLocalMasterTreeInfo();
       
-      // Lấy master tree info
-      final treeList = await _repository.getAllMasterTreeInfo();
+      if (localData.isEmpty) {
+        print('Không có dữ liệu trong local database');
+      } else {
+        print('Đã tải ${localData.length} bản ghi từ local database');
+      }
       
-      // Lấy tree details
-      await _repository.getAllTreeDetailsAndSaveLocal();
+      await _repository.printSavedData();
       
       if (mounted) {
         setState(() {
-          _masterTreeList = treeList;
+          _masterTreeList = localData;
           _isLoading = false;
+          _isInitialized = true;
         });
       }
-    } else {
+    } catch (e) {
+      print('Lỗi khi tải dữ liệu offline: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _isInitialized = true;
+        });
+        _handleError('Không thể tải dữ liệu offline');
+      }
+    }
+  }
+
+  Future<void> _loadMasterTreeInfo() async {
+    if (_isLoading) return;
+    setState(() => _isLoading = true);
+
+    try {
+      if (_isOnline) {
+        print('Đang tải dữ liệu online...');
+        final treeList = await _repository.getAllMasterTreeInfo();
+        await _repository.getAllTreeDetailsAndSaveLocal();
+        
+        if (mounted) {
+          setState(() {
+            _masterTreeList = treeList;
+            _isLoading = false;
+          });
+        }
+      } else {
+        await _loadOfflineData();
+      }
+    } catch (e) {
+      print('Lỗi tải dữ liệu: $e');
+      _handleError('Không thể tải dữ liệu');
       await _loadOfflineData();
     }
-  } catch (e) {
-    print('Lỗi tải dữ liệu: $e');
-    _handleError('Không thể tải dữ liệu');
   }
-}
 
   Future<void> _refreshData() async {
     if (_isOnline) {
@@ -435,12 +414,15 @@ Future<void> _loadMasterTreeInfo() async {
           ),
           const SizedBox(height: 16),
           Text(
-            'Chưa có dữ liệu',
+            _isOnline 
+                ? 'Chưa có dữ liệu' 
+                : 'Không có kết nối mạng và chưa có dữ liệu offline',
             style: TextStyle(
               color: Colors.grey[600],
               fontSize: 18,
               fontWeight: FontWeight.w500,
             ),
+            textAlign: TextAlign.center,
           ),
           const SizedBox(height: 8),
           if (_isOnline)
@@ -511,7 +493,13 @@ Future<void> _loadMasterTreeInfo() async {
           ),
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: _isLoading ? null : _loadMasterTreeInfo,
+            onPressed: _isLoading ? null : () {
+              if (_isOnline) {
+                _loadMasterTreeInfo();
+              } else {
+                _loadOfflineData();
+              }
+            },
             tooltip: 'Làm mới dữ liệu',
           ),
         ],
@@ -520,9 +508,7 @@ Future<void> _loadMasterTreeInfo() async {
           ? _buildLoadingView()
           : _isLoading
               ? _buildLoadingView()
-              : _masterTreeList.isEmpty
-                  ? _buildEmptyView()
-                  : _buildMainContent(),
+              : _buildMainContent(),
     );
   }
 

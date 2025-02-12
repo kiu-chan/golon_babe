@@ -79,34 +79,42 @@ class TreeDetails {
     this.masterInfo,
   });
 
-  factory TreeDetails.fromJson(Map<String, dynamic> json) {
-    return TreeDetails(
-      id: json['id'],
-      masterTreeId: json['master_tree_id'],
-      coordinateX: json['coordinate_x'] != null ? double.parse(json['coordinate_x'].toString()) : null,
-      coordinateY: json['coordinate_y'] != null ? double.parse(json['coordinate_y'].toString()) : null,
-      height: json['height'] != null ? double.parse(json['height'].toString()) : null,
-      diameter: json['trunk_diameter'] != null ? double.parse(json['trunk_diameter'].toString()) : null,
-      coverLevel: json['canopy_coverage'],
-      seaLevel: json['sea_level_height'] != null ? double.parse(json['sea_level_height'].toString()) : null,
-      imageBase64: json['image_base64'],
-      note: json['notes'],
-      createdAt: json['created_at']?.toString(),
-      masterInfo: json['tree_type'] != null 
-        ? MasterTreeInfo.fromJson({
-            'id': json['master_tree_id'],
-            'tree_type': json['tree_type'],
-            'scientific_name': json['scientific_name'],
-            'tay_name': json['tay_name'],
-            'branch': json['branch'],
-            'class': json['class'],
-            'division': json['division'],
-            'family': json['family'],
-            'genus': json['genus'],
-          }) 
-        : null,
-    );
+factory TreeDetails.fromJson(Map<String, dynamic> json) {
+  // Kiểm tra các trường bắt buộc
+  if (json['id'] == null || json['master_tree_id'] == null) {
+    throw Exception('Missing required fields: id or master_tree_id');
   }
+
+  return TreeDetails(
+    id: json['id'],
+    masterTreeId: json['master_tree_id'],
+    coordinateX: json['coordinate_x'] != null ? 
+      double.tryParse(json['coordinate_x'].toString()) : null,
+    coordinateY: json['coordinate_y'] != null ? 
+      double.tryParse(json['coordinate_y'].toString()) : null,
+    height: json['height'] != null ? 
+      double.tryParse(json['height'].toString()) : null,
+    diameter: json['trunk_diameter'] != null ? 
+      double.tryParse(json['trunk_diameter'].toString()) : null,
+    coverLevel: json['canopy_coverage'],
+    seaLevel: json['sea_level_height'] != null ? 
+      double.tryParse(json['sea_level_height'].toString()) : null,
+    imageBase64: json['image_base64'],
+    note: json['notes'],
+    createdAt: json['created_at']?.toString(),
+    masterInfo: json['tree_type'] != null ? MasterTreeInfo.fromJson({
+      'id': json['master_tree_id'],
+      'tree_type': json['tree_type'],
+      'scientific_name': json['scientific_name'],
+      'tay_name': json['tay_name'],
+      'branch': json['branch'],
+      'class': json['class'],
+      'division': json['division'],
+      'family': json['family'],
+      'genus': json['genus'],
+    }) : null,
+  );
+}
 
   Map<String, dynamic> toJson() {
     return {

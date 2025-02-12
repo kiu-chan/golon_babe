@@ -134,9 +134,14 @@ Future<int> insertTreeDetail(Map<String, dynamic> detail) async {
   try {
     final db = await database;
     print('Đang thêm chi tiết cây vào local:');
-    print(detail);
     
-    // Chuyển đổi thời gian sang String
+    // Kiểm tra và xử lý image_base64
+    String? imageBase64 = detail['image_base64'];
+    if (imageBase64 != null && imageBase64.contains(',')) {
+      // Nếu base64 có định dạng "data:image/xxx;base64,..." thì chỉ lấy phần base64
+      imageBase64 = imageBase64.split(',')[1];
+    }
+    
     final insertData = {
       'id': detail['id'],
       'master_tree_id': detail['master_tree_id'],
@@ -146,12 +151,14 @@ Future<int> insertTreeDetail(Map<String, dynamic> detail) async {
       'trunk_diameter': detail['trunk_diameter'],
       'canopy_coverage': detail['canopy_coverage'],
       'sea_level_height': detail['sea_level_height'], 
-      'image_base64': detail['image_base64'],
+      'image_base64': imageBase64, // Lưu base64 đã được xử lý
       'notes': detail['notes'],
-      'created_at': detail['created_at']?.toString(), // Chuyển sang string
+      'created_at': detail['created_at']?.toString(),
       'updated_at': detail['updated_at']?.toString() ?? DateTime.now().toIso8601String(),
       'sync_status': detail['sync_status'] ?? 'pending',
     };
+
+    print('Dữ liệu ảnh sẽ lưu: ${imageBase64?.substring(0, 50)}... (${imageBase64?.length} ký tự)');
 
     final id = await db.insert(
       'tree_details',
@@ -191,12 +198,11 @@ Future<TreeDetails?> getTreeDetailsById(int id) async {
   try {
     final db = await database;
     
-    // Sử dụng LEFT JOIN để lấy cả thông tin từ cả hai bảng
+    // Sửa lại câu query để JOIN đúng cách và lấy đầy đủ thông tin
     final results = await db.rawQuery('''
-      SELECT td.*, mti.tree_type, mti.scientific_name, mti.tay_name,
-             mti.branch, mti.class, mti.division, mti.family, mti.genus
+      SELECT td.*, mti.*
       FROM tree_details td
-      LEFT JOIN master_tree_info mti ON td.master_tree_id = mti.id
+      INNER JOIN master_tree_info mti ON td.master_tree_id = mti.id
       WHERE td.id = ?
     ''', [id]);
 
@@ -205,32 +211,48 @@ Future<TreeDetails?> getTreeDetailsById(int id) async {
       return null;
     }
 
-    // Log thông tin debug
     print('Dữ liệu từ local database cho cây $id:');
     print(results.first);
 
-    // Chuyển đổi dữ liệu và trả về
-    final combinedData = {
-      ...results.first,
-      'id': results.first['id'],
-      'master_tree_id': results.first['master_tree_id'],
-      'tree_type': results.first['tree_type'],
-      'scientific_name': results.first['scientific_name'],
-      'tay_name': results.first['tay_name'],
-      'branch': results.first['branch'],
-      'class': results.first['class'],
-      'division': results.first['division'],
-      'family': results.first['family'],
-      'genus': results.first['genus'],
-    };
+    // Tạo MasterTreeInfo trước
+    final masterInfo = MasterTreeInfo(
+      id: results.first['master_tree_id'] as int,
+      treeType: results.first['tree_type'] as String,
+      scientificName: results.first['scientific_name'] as String?,
+      tayName: results.first['tay_name'] as String?,
+      branch: results.first['branch'] as String?,
+      treeClass: results.first['class'] as String?,
+      division: results.first['division'] as String?,
+      family: results.first['family'] as String?,
+      genus: results.first['genus'] as String?,
+    );
 
-    return TreeDetails.fromJson(combinedData);
+    // Sau đó tạo TreeDetails với masterInfo
+    return TreeDetails(
+      id: results.first['id'] as int,
+      masterTreeId: results.first['master_tree_id'] as int,
+      coordinateX: results.first['coordinate_x'] != null ? 
+        double.parse(results.first['coordinate_x'].toString()) : null,
+      coordinateY: results.first['coordinate_y'] != null ? 
+        double.parse(results.first['coordinate_y'].toString()) : null,
+      height: results.first['height'] != null ? 
+        double.parse(results.first['height'].toString()) : null,
+      diameter: results.first['trunk_diameter'] != null ? 
+        double.parse(results.first['trunk_diameter'].toString()) : null,
+      coverLevel: results.first['canopy_coverage'] as String?,
+      seaLevel: results.first['sea_level_height'] != null ? 
+        double.parse(results.first['sea_level_height'].toString()) : null,
+      imageBase64: results.first['image_base64'] as String?,
+      note: results.first['notes'] as String?,
+      masterInfo: masterInfo,
+    );
   } catch (e) {
     print('Lỗi khi lấy chi tiết cây từ local database: $e');
     print('Stack trace: ${StackTrace.current}');
     return null;
   }
 }
+
 
 Future<List<Map<String, dynamic>>> getAllTreeDetails() async {
   try {

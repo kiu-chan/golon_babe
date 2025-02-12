@@ -89,101 +89,110 @@ class _CameraHandlerState extends State<CameraHandler> {
     }
   }
 
-  Widget _buildImagePreview() {
-    if (widget.currentImageBase64 == null || widget.currentImageBase64!.isEmpty) {
-      return const SizedBox.shrink();
-    }
+Widget _buildImagePreview() {
+  if (widget.currentImageBase64 == null || widget.currentImageBase64!.isEmpty) {
+    return const SizedBox.shrink();
+  }
 
-    try {
-      String base64String = widget.currentImageBase64!;
-      if (base64String.contains(',')) {
-        base64String = base64String.split(',')[1];
-      }
-      
-      final imageBytes = base64Decode(base64String);
-      
-      return Stack(
-        children: [
-          Container(
-            width: double.infinity,
-            height: 300,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.grey.shade300),
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Image.memory(
-                imageBytes,
-                fit: BoxFit.contain,
-                width: double.infinity,
-                height: 300,
-                errorBuilder: (context, error, stackTrace) {
-                  print('Error loading image: $error');
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.broken_image, size: 48, color: Colors.red[300]),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Lỗi hiển thị ảnh',
-                          style: TextStyle(color: Colors.red[300]),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
+  try {
+    String base64String = widget.currentImageBase64!;
+    
+    // Kiểm tra và thêm prefix nếu cần
+    if (!base64String.contains('data:image')) {
+      base64String = 'data:image/jpeg;base64,' + base64String;
+    }
+    
+    // Lấy phần base64 thuần túy
+    final imageData = base64String.contains(',') 
+        ? base64String.split(',')[1] 
+        : base64String;
+    
+    print('Hiển thị ảnh với độ dài base64: ${imageData.length}');
+    
+    final imageBytes = base64Decode(imageData);
+    
+    return Stack(
+      children: [
+        Container(
+          width: double.infinity,
+          height: 300,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.grey.shade300),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Image.memory(
+              imageBytes,
+              fit: BoxFit.contain,
+              width: double.infinity,
+              height: 300,
+              errorBuilder: (context, error, stackTrace) {
+                print('Lỗi hiển thị ảnh: $error');
+                print('Stack trace: $stackTrace');
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.broken_image, size: 48, color: Colors.red[300]),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Lỗi hiển thị ảnh',
+                        style: TextStyle(color: Colors.red[300]),
+                      ),
+                    ],
+                  ),
+                );
+              },
             ),
           ),
-          Positioned(
-            top: 8,
-            right: 8,
-            child: GestureDetector(
-              onTap: () {
-                widget.onImageSelected('');
-                setState(() => _imageError = null);
-              },
-              child: Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.2),
-                      blurRadius: 4,
-                    ),
-                  ],
-                ),
-                child: const Icon(Icons.close, size: 20),
+        ),
+        Positioned(
+          top: 8,
+          right: 8,
+          child: GestureDetector(
+            onTap: () {
+              widget.onImageSelected('');
+            },
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.2),
+                    blurRadius: 4,
+                  ),
+                ],
               ),
+              child: const Icon(Icons.close, size: 20),
             ),
+          ),
+        ),
+      ],
+    );
+  } catch (e) {
+    print('Lỗi xử lý ảnh base64: $e');
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.broken_image,
+            color: Colors.red[300],
+            size: 48,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Lỗi định dạng ảnh: $e',
+            style: TextStyle(color: Colors.red[300]),
           ),
         ],
-      );
-    } catch (e) {
-      print('Error decoding base64 image: $e');
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.broken_image,
-              color: Colors.red[300],
-              size: 48,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Lỗi định dạng ảnh',
-              style: TextStyle(color: Colors.red[300]),
-            ),
-          ],
-        ),
-      );
-    }
+      ),
+    );
   }
+}
 
   void _showPermissionDeniedDialog() {
     showDialog(
