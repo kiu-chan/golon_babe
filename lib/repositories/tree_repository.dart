@@ -42,6 +42,16 @@ Future<bool> hasInternetConnection() async {
   }
 }
 
+  Future<TreeDetails?> getLocalTreeDetails(int id) async {
+    try {
+      print('Tìm kiếm cây ID $id trong local database...');
+      return await _localDb.getTreeDetailsById(id);
+    } catch (e) {
+      print('Lỗi khi tìm kiếm trong local: $e');
+      return null;
+    }
+  }
+
   // Lấy danh sách cây mẫu
 Future<List<MasterTreeInfo>> getAllMasterTreeInfo() async {
   try {
@@ -181,57 +191,49 @@ Future<TreeDetails?> getTreeDetailsById(int id) async {
     }
   }
 
-  // Lưu thông tin cây
 Future<bool> saveTreeDetails(TreeDetails details) async {
-  try {
-    print('Bắt đầu lưu thông tin cây...');
-    
-    // Luôn lưu vào local trước
-    if (details.id != null) {
-      print('Cập nhật cây ID: ${details.id} vào local...');
-      final localSuccess = await _localDb.updateTreeDetail(details.id!, {
-        ...details.toJson(),
-        'sync_status': 'pending',
-      });
+    try {
+      print('\n=== BẮT ĐẦU LƯU THÔNG TIN CÂY ===');
+      final id = details.id;
+      
+      if (id != null) {
+        print('Cập nhật cây ID: $id');
+      } else {
+        print('Thêm cây mới');
+      }
+
+      // Luôn lưu vào local trước
+      final localSuccess = await saveTreeToLocal(details);
       if (!localSuccess) {
         print('Lỗi lưu local database');
         return false;
       }
-    } else {
-      print('Thêm cây mới vào local...');
-      final localId = await _localDb.insertTreeDetail({
-        ...details.toJson(),
-        'sync_status': 'pending',
-      });
-      if (localId <= 0) {
-        print('Lỗi lưu local database');
-        return false;
-      }
-    }
 
-    // Nếu online thì đồng bộ luôn lên server
-    if (await hasInternetConnection()) {
-      print('Đang đồng bộ lên server...');
-      final success = await _remoteDb.saveTreeDetails(details);
-      
-      if (success) {
-        print('Đồng bộ server thành công');
-        if (details.id != null) {
-          await _localDb.markAsSynced(details.id!);
+      print('Đã lưu thành công vào local database');
+
+      // Nếu online thì đồng bộ luôn
+      if (await hasInternetConnection()) {
+        print('Đang đồng bộ lên server...');
+        final success = await _remoteDb.saveTreeDetails(details);
+        
+        if (success && id != null) {
+          await _localDb.markAsSynced(id);
+          print('Đã đồng bộ server thành công');
         }
+        return success;
+      } else {
+        print('Offline - Đã lưu vào local, sẽ đồng bộ sau');
         return true;
       }
-    } else {
-      print('Offline - Đã lưu vào local, sẽ đồng bộ sau');
-      return true;
-    }
 
-  } catch (e) {
-    print('Lỗi khi lưu chi tiết cây: $e');
-    print('Stack trace: ${StackTrace.current}');
+    } catch (e) {
+      print('Lỗi khi lưu thông tin cây:');
+      print(e.toString());
+      print('Stack trace:');
+      print(StackTrace.current);
+      return false;
+    }
   }
-  return false;
-}
 
   // Đồng bộ dữ liệu
 Future<void> syncData() async {
@@ -285,6 +287,34 @@ Future<void> syncData() async {
     _isSyncing = false;
   }
 }
+
+Future<bool> saveTreeToLocal(TreeDetails tree) async {
+    try {
+      final data = {
+        'id': tree.id,
+        'master_tree_id': tree.masterTreeId,
+        'coordinate_x': tree.coordinateX,
+        'coordinate_y': tree.coordinateY,
+        'height': tree.height,
+        'trunk_diameter': tree.diameter,
+        'canopy_coverage': tree.coverLevel,
+        'sea_level_height': tree.seaLevel,
+        'image_base64': tree.imageBase64,
+        'notes': tree.note,
+        'sync_status': 'pending'
+      };
+
+      if (tree.id != null) {
+        return await _localDb.updateTreeDetail(tree.id!, data);
+      } else {
+        final id = await _localDb.insertTreeDetail(data);
+        return id > 0;
+      }
+    } catch (e) {
+      print('Lỗi khi lưu vào local: $e');
+      return false;
+    }
+  }
 
   // Đồng bộ một cây cụ thể
   Future<bool> syncTreeDetail(int id) async {

@@ -1,17 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:golon_babe/models/tree_model.dart';
 import 'package:golon_babe/repositories/tree_repository.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:permission_handler/permission_handler.dart';
-import 'tree_form_validator.dart';
-import 'dart:io';
-import 'dart:convert';
 
 class TreeFormController {
-  // Form key
+  // Form key để validate
   final formKey = GlobalKey<FormState>();
 
-  // Text controllers
+  // Text controllers cho các trường nhập liệu
   final idController = TextEditingController();
   final coordinateXController = TextEditingController();
   final coordinateYController = TextEditingController();
@@ -20,7 +15,7 @@ class TreeFormController {
   final seaLevelController = TextEditingController();
   final noteController = TextEditingController();
   
-  // Thông tin cây master
+  // Controllers cho thông tin cây master
   final tayNameController = TextEditingController();
   final scientificNameController = TextEditingController();
   final branchController = TextEditingController();
@@ -38,26 +33,30 @@ class TreeFormController {
   String? imageError;
 
   final TreeRepository _repository;
-  final ImagePicker _picker = ImagePicker();
 
   TreeFormController(this._repository);
 
-  // Xử lý cập nhật thông tin cây master
-  void updateTreeInfo(MasterTreeInfo? tree) {
-    selectedTree = tree;
-    if (tree != null) {
-      tayNameController.text = tree.tayName ?? '';
-      scientificNameController.text = tree.scientificName ?? '';
-      branchController.text = tree.branch ?? '';
-      treeClassController.text = tree.treeClass ?? '';
-      divisionController.text = tree.division ?? '';
-      familyController.text = tree.family ?? '';
-      genusController.text = tree.genus ?? '';
-    } else {
-      _clearMasterTreeInfo();
-    }
+  // Reset form về trạng thái ban đầu
+  void resetForm() {
+    print('Reset form về trạng thái ban đầu');
+    isEditing = false;
+    editingId = null;
+    selectedTree = null;
+    selectedCoverLevel = null;
+    imageBase64 = null;
+    imageError = null;
+    
+    // Reset các text controllers
+    coordinateXController.clear();
+    coordinateYController.clear();
+    heightController.clear();
+    diameterController.clear();
+    seaLevelController.clear();
+    noteController.clear();
+    _clearMasterTreeInfo();
   }
 
+  // Xóa thông tin cây master
   void _clearMasterTreeInfo() {
     tayNameController.clear();
     scientificNameController.clear();
@@ -68,101 +67,128 @@ class TreeFormController {
     genusController.clear();
   }
 
-  // Xử lý tìm kiếm cây theo ID
+  // Cập nhật thông tin cây master
+  void updateTreeInfo(MasterTreeInfo? tree) {
+    selectedTree = tree;
+    if (tree != null) {
+      print('Cập nhật thông tin master tree: ${tree.treeType}');
+      tayNameController.text = tree.tayName ?? '';
+      scientificNameController.text = tree.scientificName ?? '';
+      branchController.text = tree.branch ?? '';
+      treeClassController.text = tree.treeClass ?? '';
+      divisionController.text = tree.division ?? '';
+      familyController.text = tree.family ?? '';
+      genusController.text = tree.genus ?? '';
+    } else {
+      print('Xóa thông tin master tree');
+      _clearMasterTreeInfo();
+    }
+  }
+
+  // Tìm kiếm cây theo ID
   Future<bool> searchTreeById(String id) async {
     try {
       final idNumber = int.tryParse(id);
       if (idNumber == null) return false;
       
-      print('Đang tìm kiếm cây với ID: $idNumber');
-      final tree = await _repository.getTreeDetailsById(idNumber);
+      print('=== BẮT ĐẦU TÌM KIẾM CÂY ===');
+      print('Tìm kiếm cây ID: $idNumber');
       
-      if (tree != null) {
-        print('Đã tìm thấy cây: ${tree.id}');
+      // Tìm trong local trước
+      print('Tìm kiếm trong database local...');
+      final localTree = await _repository.getLocalTreeDetails(idNumber);
+      
+      if (localTree != null) {
+        print('Đã tìm thấy cây trong local database:');
+        print('ID: ${localTree.id}');
+        print('Master Tree ID: ${localTree.masterTreeId}');
+        
+        // Cập nhật trạng thái form
         isEditing = true;
-        editingId = tree.id;
+        editingId = localTree.id;
         
-        // Cập nhật thông tin form
-        coordinateXController.text = tree.coordinateX?.toString() ?? '';
-        coordinateYController.text = tree.coordinateY?.toString() ?? '';
-        heightController.text = tree.height?.toString() ?? '';
-        diameterController.text = tree.diameter?.toString() ?? '';
-        selectedCoverLevel = tree.coverLevel;
-        seaLevelController.text = tree.seaLevel?.toString() ?? '';
-        noteController.text = tree.note ?? '';
-        
-        // Cập nhật ảnh
-        if (tree.imageBase64 != null && tree.imageBase64!.isNotEmpty) {
-          imageBase64 = tree.imageBase64;
-          print('Đã tải ảnh: ${tree.imageBase64!.length} ký tự');
-        } else {
-          imageBase64 = null;
-          print('Không có ảnh cho cây này');
-        }
-        
-        // Cập nhật thông tin master tree
-        if (tree.masterInfo != null) {
-          selectedTree = tree.masterInfo;
-          updateTreeInfo(tree.masterInfo);
-          print('Đã cập nhật thông tin master tree: ${tree.masterInfo!.treeType}');
-        } else {
-          print('Không tìm thấy thông tin master tree');
-        }
-        
+        // Cập nhật form với dữ liệu local
+        _updateFormWithTreeDetails(localTree);
         return true;
-      } else {
-        print('Không tìm thấy cây với ID: $idNumber');
-        resetForm();
-        return false;
       }
+      
+      print('Không tìm thấy trong local, thử tìm trên server...');
+      final onlineTree = await _repository.getTreeDetailsById(idNumber);
+      
+      if (onlineTree != null) {
+        print('Đã tìm thấy cây trên server, lưu vào local...');
+        
+        // Lưu vào local database
+        await _repository.saveTreeToLocal(onlineTree);
+        
+        isEditing = true;
+        editingId = onlineTree.id;
+        
+        // Cập nhật form với dữ liệu từ server
+        _updateFormWithTreeDetails(onlineTree);
+        return true;
+      }
+      
+      print('Không tìm thấy cây ID: $idNumber');
+      resetForm();
+      return false;
+      
     } catch (e) {
-      print('Lỗi khi tìm kiếm cây: $e');
-      print('Stack trace: ${StackTrace.current}');
+      print('Lỗi khi tìm kiếm cây:');
+      print(e.toString());
+      print('Stack trace:');
+      print(StackTrace.current);
       resetForm();
       return false;
     }
   }
 
-  // Reset form về trạng thái ban đầu
-  void resetForm() {
-    isEditing = false;
-    editingId = null;
-    selectedTree = null;
-    selectedCoverLevel = null;
-    imageBase64 = null;
-    imageError = null;
+  // Cập nhật form với dữ liệu cây
+  void _updateFormWithTreeDetails(TreeDetails tree) {
+    print('Cập nhật form với dữ liệu cây:');
+    print('ID: ${tree.id}');
+    print('Master Tree ID: ${tree.masterTreeId}');
     
-    coordinateXController.clear();
-    coordinateYController.clear();
-    heightController.clear();
-    diameterController.clear();
-    seaLevelController.clear();
-    noteController.clear();
-    _clearMasterTreeInfo();
+    coordinateXController.text = tree.coordinateX?.toString() ?? '';
+    coordinateYController.text = tree.coordinateY?.toString() ?? '';
+    heightController.text = tree.height?.toString() ?? '';
+    diameterController.text = tree.diameter?.toString() ?? '';
+    selectedCoverLevel = tree.coverLevel;
+    seaLevelController.text = tree.seaLevel?.toString() ?? '';
+    noteController.text = tree.note ?? '';
+    imageBase64 = tree.imageBase64;
+    
+    if (tree.masterInfo != null) {
+      selectedTree = tree.masterInfo;
+      updateTreeInfo(tree.masterInfo);
+      print('Đã cập nhật thông tin master tree: ${tree.masterInfo!.treeType}');
+    }
   }
 
   // Xử lý submit form
-  Future<void> handleSubmit(Function(TreeDetails) onSubmit) async {
+  Future<bool> handleSubmit() async {
+    print('\n=== XỬ LÝ SUBMIT FORM ===');
+    
     if (!formKey.currentState!.validate()) {
       print('Form validation failed');
-      return;
+      return false;
     }
 
     if (selectedTree == null) {
       print('Chưa chọn loại cây');
-      return;
+      return false;
     }
 
     try {
       final details = TreeDetails(
         id: editingId,
         masterTreeId: selectedTree!.id,
-        coordinateX: TreeFormValidator.parseNumber(coordinateXController.text),
-        coordinateY: TreeFormValidator.parseNumber(coordinateYController.text),
-        height: TreeFormValidator.parseNumber(heightController.text),
-        diameter: TreeFormValidator.parseNumber(diameterController.text),
+        coordinateX: _parseDouble(coordinateXController.text),
+        coordinateY: _parseDouble(coordinateYController.text),
+        height: _parseDouble(heightController.text),
+        diameter: _parseDouble(diameterController.text),
         coverLevel: selectedCoverLevel,
-        seaLevel: TreeFormValidator.parseNumber(seaLevelController.text),
+        seaLevel: _parseDouble(seaLevelController.text),
         imageBase64: imageBase64,
         note: noteController.text,
         masterInfo: selectedTree,
@@ -175,20 +201,39 @@ class TreeFormController {
         print('Thêm cây mới');
       }
 
-      onSubmit(details);
+      final success = await _repository.saveTreeDetails(details);
       
-      print('Đã lưu thông tin cây thành công');
-      formKey.currentState!.reset();
-      resetForm();
+      if (success) {
+        print('Đã lưu thông tin cây thành công');
+        formKey.currentState!.reset();
+        resetForm();
+      } else {
+        print('Lỗi khi lưu thông tin cây');
+      }
       
+      return success;
+
     } catch (e) {
-      print('Lỗi khi lưu thông tin cây: $e');
-      print('Stack trace: ${StackTrace.current}');
-      rethrow;
+      print('Lỗi khi xử lý submit form:');
+      print(e.toString());
+      print('Stack trace:');
+      print(StackTrace.current);
+      return false;
     }
   }
 
-  // Giải phóng tài nguyên
+  // Helper function để parse double an toàn
+  double? _parseDouble(String value) {
+    if (value.isEmpty) return null;
+    try {
+      return double.parse(value.replaceAll(',', '.'));
+    } catch (e) {
+      print('Lỗi parse double: $value');
+      return null;
+    }
+  }
+
+  // Dispose để giải phóng tài nguyên
   void dispose() {
     idController.dispose();
     coordinateXController.dispose();

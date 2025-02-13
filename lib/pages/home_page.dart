@@ -470,7 +470,7 @@ Future<void> _initialDataLoad() async {
     return Scaffold(
       appBar: AppBar(
         title: const Text(
-          'Quản lý cây xanh',
+          'Quản lý cây gỗ lớn Ba Bể',
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
         centerTitle: true,

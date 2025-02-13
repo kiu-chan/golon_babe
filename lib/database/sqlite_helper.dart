@@ -219,42 +219,63 @@ Future<void> insertMasterTreeInfo(List<Map<String, dynamic>> trees) async {
   Future<bool> updateTreeDetail(int id, Map<String, dynamic> detail) async {
     try {
       final db = await database;
-      int count = 0;
+      print('\n=== CẬP NHẬT CÂY TRONG SQLITE ===');
+      print('ID cây cần cập nhật: $id');
+
+      // Kiểm tra sự tồn tại của bản ghi
+      final exists = Sqflite.firstIntValue(await db.rawQuery(
+        'SELECT COUNT(*) FROM tree_details WHERE id = ?', [id]
+      ));
       
-      await db.transaction((txn) async {
-        // Xử lý ảnh base64
-        String? imageBase64 = detail['image_base64'];
-        if (imageBase64 != null && imageBase64.contains(',')) {
-          imageBase64 = imageBase64.split(',')[1];
+      if (exists == 0) {
+        print('Cây ID $id không tồn tại trong SQLite, thử thêm mới...');
+        // Nếu không tồn tại, thử insert
+        detail['id'] = id;
+        final insertId = await insertTreeDetail(detail);
+        return insertId > 0;
+      }
+
+      print('Cây ID $id tồn tại, tiến hành cập nhật...');
+      
+      // Xử lý dữ liệu cập nhật
+      final updateData = Map<String, dynamic>.from(detail);
+      updateData['updated_at'] = DateTime.now().toIso8601String();
+      updateData['sync_status'] = 'pending';
+
+      // Xử lý ảnh base64
+      if (updateData['image_base64'] != null && 
+          updateData['image_base64'].toString().contains(',')) {
+        updateData['image_base64'] = 
+          updateData['image_base64'].toString().split(',')[1];
+      }
+
+      print('Dữ liệu cập nhật đã xử lý:');
+      updateData.forEach((key, value) {
+        if (key != 'image_base64') {
+          print('$key: $value');
+        } else {
+          print('image_base64: [${value != null ? 'Có ảnh' : 'Không có ảnh'}]');
         }
+      });
 
-        final updateData = {
-          'master_tree_id': detail['master_tree_id'],
-          'coordinate_x': detail['coordinate_x'],
-          'coordinate_y': detail['coordinate_y'],
-          'height': detail['height'],
-          'trunk_diameter': detail['trunk_diameter'],
-          'canopy_coverage': detail['canopy_coverage'],
-          'sea_level_height': detail['sea_level_height'],
-          'image_base64': imageBase64,
-          'notes': detail['notes'],
-          'updated_at': DateTime.now().toIso8601String(),
-          'sync_status': detail['sync_status'] ?? 'pending',
-        };
-
-        count = await txn.update(
+      int count = await db.transaction((txn) async {
+        return await txn.update(
           'tree_details',
           updateData,
           where: 'id = ?',
           whereArgs: [id],
+          conflictAlgorithm: ConflictAlgorithm.replace,
         );
       });
 
-      print('Đã cập nhật chi tiết cây ID $id: ${count > 0 ? "thành công" : "thất bại"}');
+      print('Kết quả cập nhật: ${count > 0 ? "thành công" : "thất bại"}');
       return count > 0;
+
     } catch (e) {
-      print('Lỗi khi cập nhật chi tiết cây: $e');
-      print('Stack trace: ${StackTrace.current}');
+      print('Lỗi khi cập nhật SQLite:');
+      print(e.toString());
+      print('Stack trace:');
+      print(StackTrace.current);
       return false;
     }
   }
@@ -262,26 +283,27 @@ Future<void> insertMasterTreeInfo(List<Map<String, dynamic>> trees) async {
   Future<TreeDetails?> getTreeDetailsById(int id) async {
     try {
       final db = await database;
+      print('Truy vấn chi tiết cây ID $id từ SQLite...');
       
       final results = await db.rawQuery('''
         SELECT td.*, mti.*
         FROM tree_details td
-        INNER JOIN master_tree_info mti ON td.master_tree_id = mti.id
+        LEFT JOIN master_tree_info mti ON td.master_tree_id = mti.id
         WHERE td.id = ?
       ''', [id]);
 
       if (results.isEmpty) {
-        print('Không tìm thấy chi tiết cây ID $id trong local database');
+        print('Không tìm thấy cây ID $id trong SQLite');
         return null;
       }
 
       final row = results.first;
-      print('Đã tìm thấy chi tiết cây ID $id trong local');
+      print('Đã tìm thấy cây ID $id trong SQLite');
 
       // Tạo đối tượng MasterTreeInfo
-      final masterInfo = MasterTreeInfo(
+      final masterInfo = row['master_tree_id'] != null ? MasterTreeInfo(
         id: row['master_tree_id'] as int,
-        treeType: row['tree_type'] as String,
+        treeType: row['tree_type'] as String? ?? '',
         scientificName: row['scientific_name'] as String?,
         tayName: row['tay_name'] as String?,
         branch: row['branch'] as String?,
@@ -289,7 +311,7 @@ Future<void> insertMasterTreeInfo(List<Map<String, dynamic>> trees) async {
         division: row['division'] as String?,
         family: row['family'] as String?,
         genus: row['genus'] as String?,
-      );
+      ) : null;
 
       // Tạo đối tượng TreeDetails
       return TreeDetails(
@@ -311,8 +333,10 @@ Future<void> insertMasterTreeInfo(List<Map<String, dynamic>> trees) async {
         masterInfo: masterInfo,
       );
     } catch (e) {
-      print('Lỗi khi lấy chi tiết cây by id: $e');
-      print('Stack trace: ${StackTrace.current}');
+      print('Lỗi khi truy vấn SQLite:');
+      print(e.toString());
+      print('Stack trace:');
+      print(StackTrace.current);
       return null;
     }
   }
