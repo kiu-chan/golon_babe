@@ -216,69 +216,71 @@ Future<void> insertMasterTreeInfo(List<Map<String, dynamic>> trees) async {
     }
   }
 
-  Future<bool> updateTreeDetail(int id, Map<String, dynamic> detail) async {
-    try {
-      final db = await database;
-      print('\n=== CẬP NHẬT CÂY TRONG SQLITE ===');
-      print('ID cây cần cập nhật: $id');
+Future<bool> updateTreeDetail(int id, Map<String, dynamic> detail) async {
+  try {
+    final db = await database;
+    print('\n=== CẬP NHẬT CÂY TRONG SQLITE ===');
+    print('ID cây cần cập nhật: $id');
 
-      // Kiểm tra sự tồn tại của bản ghi
-      final exists = Sqflite.firstIntValue(await db.rawQuery(
-        'SELECT COUNT(*) FROM tree_details WHERE id = ?', [id]
-      ));
-      
-      if (exists == 0) {
-        print('Cây ID $id không tồn tại trong SQLite, thử thêm mới...');
-        // Nếu không tồn tại, thử insert
-        detail['id'] = id;
-        final insertId = await insertTreeDetail(detail);
-        return insertId > 0;
-      }
-
-      print('Cây ID $id tồn tại, tiến hành cập nhật...');
-      
-      // Xử lý dữ liệu cập nhật
-      final updateData = Map<String, dynamic>.from(detail);
-      updateData['updated_at'] = DateTime.now().toIso8601String();
-      updateData['sync_status'] = 'pending';
-
-      // Xử lý ảnh base64
-      if (updateData['image_base64'] != null && 
-          updateData['image_base64'].toString().contains(',')) {
-        updateData['image_base64'] = 
-          updateData['image_base64'].toString().split(',')[1];
-      }
-
-      print('Dữ liệu cập nhật đã xử lý:');
-      updateData.forEach((key, value) {
-        if (key != 'image_base64') {
-          print('$key: $value');
-        } else {
-          print('image_base64: [${value != null ? 'Có ảnh' : 'Không có ảnh'}]');
-        }
-      });
-
-      int count = await db.transaction((txn) async {
-        return await txn.update(
-          'tree_details',
-          updateData,
-          where: 'id = ?',
-          whereArgs: [id],
-          conflictAlgorithm: ConflictAlgorithm.replace,
-        );
-      });
-
-      print('Kết quả cập nhật: ${count > 0 ? "thành công" : "thất bại"}');
-      return count > 0;
-
-    } catch (e) {
-      print('Lỗi khi cập nhật SQLite:');
-      print(e.toString());
-      print('Stack trace:');
-      print(StackTrace.current);
-      return false;
+    // Kiểm tra sự tồn tại của bản ghi
+    final exists = Sqflite.firstIntValue(await db.rawQuery(
+      'SELECT COUNT(*) FROM tree_details WHERE id = ?', [id]
+    ));
+    
+    if (exists == 0) {
+      print('Cây ID $id không tồn tại trong SQLite, thử thêm mới...');
+      detail['id'] = id;
+      final insertId = await insertTreeDetail(detail);
+      return insertId > 0;
     }
+
+    print('Cây ID $id tồn tại, tiến hành cập nhật...');
+    
+    // Đảm bảo dữ liệu cập nhật có đầy đủ thông tin
+    final updateData = Map<String, dynamic>.from(detail);
+    updateData['updated_at'] = DateTime.now().toIso8601String();
+    updateData['sync_status'] = 'pending'; // Đánh dấu cần đồng bộ
+
+    // Xử lý ảnh base64
+    if (updateData['image_base64'] != null && 
+        updateData['image_base64'].toString().contains(',')) {
+      updateData['image_base64'] = 
+        updateData['image_base64'].toString().split(',')[1];
+    }
+
+    // Loại bỏ các trường null để tránh ghi đè giá trị cũ bằng null
+    updateData.removeWhere((key, value) => value == null);
+
+    print('Dữ liệu cập nhật đã xử lý:');
+    updateData.forEach((key, value) {
+      if (key != 'image_base64') {
+        print('$key: $value');
+      } else {
+        print('image_base64: [${value != null ? 'Có ảnh' : 'Không có ảnh'}]');
+      }
+    });
+
+    int count = await db.transaction((txn) async {
+      return await txn.update(
+        'tree_details',
+        updateData,
+        where: 'id = ?',
+        whereArgs: [id],
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    });
+
+    print('Kết quả cập nhật: ${count > 0 ? "thành công" : "thất bại"}');
+    return count > 0;
+
+  } catch (e) {
+    print('Lỗi khi cập nhật SQLite:');
+    print(e.toString());
+    print('Stack trace:');
+    print(StackTrace.current);
+    return false;
   }
+}
 
   Future<TreeDetails?> getTreeDetailsById(int id) async {
     try {
