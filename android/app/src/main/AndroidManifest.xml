@@ -13,7 +13,7 @@
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
     
     <application
-        android:label="golon_babe"
+        android:label="Cây gỗ Ba Bể"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         
