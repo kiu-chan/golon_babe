@@ -39,22 +39,55 @@ class _TreeFormState extends State<TreeForm> {
     _loadMasterTreeList();
   }
 
-  Future<void> _setupConnectivity() async {
-    try {
-      final connectivity = Connectivity();
-      final result = await connectivity.checkConnectivity();
-      setState(() => _isOnline = result != ConnectivityResult.none);
+Future<void> _setupConnectivity() async {
+  try {
+    final connectivity = Connectivity();
+    
+    // Kiểm tra kết nối ban đầu
+    final result = await connectivity.checkConnectivity();
+    final hasConnection = result != ConnectivityResult.none;
+    
+    // Kiểm tra kết nối database nếu có mạng
+    final isConnected = hasConnection ? 
+        await widget.repository.hasInternetConnection() : false;
+    
+    if (mounted) {
+      setState(() => _isOnline = isConnected);
+      if (isConnected != _isOnline) {
+        _showConnectivitySnackBar();
+      }
+    }
 
-      connectivity.onConnectivityChanged.listen((result) {
-        if (mounted) {
-          setState(() => _isOnline = result != ConnectivityResult.none);
+    // Lắng nghe sự thay đổi kết nối
+    connectivity.onConnectivityChanged.listen((result) async {
+      if (!mounted) return;
+      
+      final hasConnection = result != ConnectivityResult.none;
+      if (hasConnection) {
+        // Kiểm tra kết nối database khi có mạng
+        final isConnected = await widget.repository.hasInternetConnection();
+        if (mounted && isConnected != _isOnline) {
+          setState(() => _isOnline = isConnected);
+          _showConnectivitySnackBar();
+          if (isConnected) {
+            // Tải lại dữ liệu khi kết nối được khôi phục
+            await _loadMasterTreeList();
+          }
+        }
+      } else {
+        if (mounted && _isOnline) {
+          setState(() => _isOnline = false);
           _showConnectivitySnackBar();
         }
-      });
-    } catch (e) {
-      print('Lỗi kiểm tra kết nối: $e');
+      }
+    });
+  } catch (e) {
+    print('Lỗi kiểm tra kết nối: $e');
+    if (mounted) {
+      setState(() => _isOnline = false);
     }
   }
+}
 
   Future<void> _loadMasterTreeList() async {
     try {

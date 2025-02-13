@@ -56,52 +56,71 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<void> _setupConnectivity() async {
-    try {
-      final connectivity = Connectivity();
-      final connectivityResult = await connectivity.checkConnectivity();
-      _isOnline = connectivityResult != ConnectivityResult.none;
-
-      _connectivitySubscription = connectivity.onConnectivityChanged.listen((dynamic result) async {
-        if (!mounted) return;
-
-        final connectivityResult = result is List<ConnectivityResult> 
-            ? result.first 
-            : result as ConnectivityResult;
-        
-        final hasConnection = connectivityResult != ConnectivityResult.none;
-        final wasOnline = _isOnline;
-        
-        setState(() => _isOnline = hasConnection);
-
-        if (hasConnection != wasOnline) {
-          if (hasConnection) {
-            _showConnectionStatusSnackBar('Đã kết nối mạng', Colors.green);
-            await _handleOnlineConnection();
-          } else {
-            _showConnectionStatusSnackBar('Đang sử dụng dữ liệu offline', Colors.orange);
-            await _loadOfflineData();
-          }
-        }
-      });
-    } catch (e) {
-      print('Lỗi thiết lập kết nối: $e');
-      _isOnline = false;
-    }
-  }
-
-  Future<void> _handleOnlineConnection() async {
-    try {
-      final shouldSync = await _shouldSyncData();
-      if (shouldSync) {
-        await _syncData();
+Future<void> _setupConnectivity() async {
+  try {
+    final connectivity = Connectivity();
+    
+    // Kiểm tra kết nối ban đầu
+    final result = await connectivity.checkConnectivity();
+    final hasConnection = result != ConnectivityResult.none;
+    
+    // Kiểm tra kết nối database nếu có mạng
+    final isConnected = hasConnection ? 
+        await _repository.hasInternetConnection() : false;
+    
+    if (mounted) {
+      setState(() => _isOnline = isConnected);
+      if (isConnected) {
+        _showConnectionStatusSnackBar('Đã kết nối mạng', Colors.green);
+        await _handleOnlineConnection(); // Đồng bộ ngay khi khởi động
       }
-      await _loadMasterTreeInfo();
-    } catch (e) {
-      print('Lỗi xử lý kết nối online: $e');
-      _handleError('Không thể cập nhật dữ liệu');
+    }
+
+    // Lắng nghe sự thay đổi kết nối
+    _connectivitySubscription = connectivity.onConnectivityChanged.listen((dynamic result) async {
+      if (!mounted) return;
+      
+      final connectivityResult = result is List<ConnectivityResult> 
+          ? result.first 
+          : result as ConnectivityResult;
+      
+      final hasConnection = connectivityResult != ConnectivityResult.none;
+      if (hasConnection) {
+        // Thêm delay nhỏ để đợi kết nối ổn định
+        await Future.delayed(const Duration(milliseconds: 500));
+        final isConnected = await _repository.hasInternetConnection();
+        if (mounted && isConnected) {
+          setState(() => _isOnline = true);
+          _showConnectionStatusSnackBar('Đã kết nối mạng', Colors.green);
+          await _handleOnlineConnection();
+        }
+      } else {
+        if (mounted) {
+          setState(() => _isOnline = false);
+          _showConnectionStatusSnackBar('Đang sử dụng dữ liệu offline', Colors.orange);
+          await _loadOfflineData();
+        }
+      }
+    });
+  } catch (e) {
+    print('Lỗi thiết lập kết nối: $e');
+    if (mounted) {
+      setState(() => _isOnline = false);
     }
   }
+}
+
+Future<void> _handleOnlineConnection() async {
+  try {
+    print('\n=== XỬ LÝ KẾT NỐI ONLINE ===');
+    // Đồng bộ dữ liệu ngay khi có kết nối
+    await _syncData();
+    await _loadMasterTreeInfo();
+  } catch (e) {
+    print('Lỗi xử lý kết nối online: $e');
+    _handleError('Không thể cập nhật dữ liệu');
+  }
+}
 
 Future<void> _initialDataLoad() async {
   try {
@@ -204,32 +223,34 @@ Future<void> _initialDataLoad() async {
     );
   }
 
-  Future<void> _syncData() async {
-    if (_isSyncing || !_isOnline) return;
-    
-    setState(() {
-      _isLoading = true;
-      _isSyncing = true;
-    });
+Future<void> _syncData() async {
+  if (_isSyncing || !_isOnline) return;
+  
+  setState(() {
+    _isLoading = true;
+    _isSyncing = true;
+  });
 
-    try {
-      await _repository.syncData();
-      _prefs?.setString('last_sync_date', DateTime.now().toIso8601String());
-      if (mounted) {
-        _showSuccessSnackBar('Đồng bộ dữ liệu thành công');
-      }
-    } catch (e) {
-      print('Lỗi đồng bộ: $e');
-      _handleError('Lỗi đồng bộ dữ liệu');
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isSyncing = false;
-          _isLoading = false;
-        });
-      }
+  try {
+    print('Bắt đầu đồng bộ dữ liệu...');
+    await _repository.syncData();
+    _prefs?.setString('last_sync_date', DateTime.now().toIso8601String());
+    
+    if (mounted) {
+      _showSuccessSnackBar('Đồng bộ dữ liệu thành công');
+    }
+  } catch (e) {
+    print('Lỗi đồng bộ: $e');
+    _handleError('Lỗi đồng bộ dữ liệu');
+  } finally {
+    if (mounted) {
+      setState(() {
+        _isSyncing = false;
+        _isLoading = false;
+      });
     }
   }
+}
 
   Future<void> _loadOfflineData() async {
     if (_isLoading) return;

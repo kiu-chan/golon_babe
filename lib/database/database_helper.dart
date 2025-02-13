@@ -360,11 +360,47 @@ Future<Map<String, dynamic>?> getTreeDetailsById(int id) async {
 
 Future<bool> testConnection() async {
   try {
-    final conn = await connection;
-    await conn.query('SELECT 1');
+    print('Bắt đầu kiểm tra kết nối database...');
+    
+    // Đóng kết nối cũ nếu có
+    if (_connection != null) {
+      try {
+        await _connection!.close();
+      } catch (e) {
+        print('Lỗi đóng kết nối cũ: $e');
+      }
+      _connection = null;
+      _isConnecting = false;
+    }
+
+    // Thử tạo kết nối mới
+    _connection = PostgreSQLConnection(
+      _host,
+      _port,
+      _database,
+      username: _username,
+      password: _password,
+      timeoutInSeconds: 5,
+      queryTimeoutInSeconds: 5,
+      timeZone: 'UTC',
+      useSSL: false,
+    );
+
+    await _connection!.open();
+    await _connection!.query('SELECT 1');
+    print('Kiểm tra kết nối thành công');
     return true;
   } catch (e) {
-    print('Connection test failed: $e');
+    print('Kiểm tra kết nối thất bại: $e');
+    if (_connection != null) {
+      try {
+        await _connection!.close();
+      } catch (e) {
+        print('Lỗi đóng kết nối lỗi: $e');
+      }
+      _connection = null;
+      _isConnecting = false;
+    }
     return false;
   }
 }
