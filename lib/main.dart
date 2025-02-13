@@ -9,13 +9,19 @@ void main() async {
   // Khởi tạo notification
   final flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
   const initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
+  
+  // Thêm cấu hình cho iOS
+  const initializationSettingsIOS = DarwinInitializationSettings();  // Thêm dòng này
+
   const initializationSettings = InitializationSettings(
     android: initializationSettingsAndroid,
+    iOS: initializationSettingsIOS  // Thêm dòng này
   );
-  await flutterLocalNotificationsPlugin.initialize(initializationSettings);
 
+  await flutterLocalNotificationsPlugin.initialize(initializationSettings);
+  
   // Khởi tạo background service
   await initBackgroundSync();
-
+  
   runApp(const App());
 }
