@@ -268,7 +268,7 @@ Widget _buildImagePreview() {
             Expanded(
               child: ElevatedButton.icon(
                 onPressed: _handleCameraPermission,
-                icon: const Icon(Icons.camera_alt),
+                icon: const Icon(Icons.camera_alt, color: Colors.white),
                 label: const Text('Chụp ảnh'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.lightGreen,
@@ -284,7 +284,7 @@ Widget _buildImagePreview() {
             Expanded(
               child: ElevatedButton.icon(
                 onPressed: () => _pickImage(ImageSource.gallery),
-                icon: const Icon(Icons.photo_library),
+                icon: const Icon(Icons.photo_library, color: Colors.lightGreen),
                 label: const Text('Chọn ảnh'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.white,

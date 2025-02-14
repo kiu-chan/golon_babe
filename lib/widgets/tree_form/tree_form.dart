@@ -358,6 +358,7 @@ Future<void> _setupConnectivity() async {
                         Icon(
                           _controller.isEditing ? Icons.update : Icons.add_circle,
                           size: 24,
+                          color: Colors.white,
                         ),
                         const SizedBox(width: 8),
                         Text(

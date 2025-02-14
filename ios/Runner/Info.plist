@@ -2,6 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+    <key>NSUserNotificationAlertStyle</key>
+    <string>alert</string>
+    <key>NSUserNotificationUsageDescription</key>
+    <string>Chúng tôi cần gửi thông báo để cập nhật thông tin cho bạn</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Ứng dụng cần quyền truy cập máy ảnh để chụp ảnh cây</string>
 	<key>NSPhotoLibraryUsageDescription</key>
