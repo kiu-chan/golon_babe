@@ -436,16 +436,32 @@ Future<void> _setupConnectivity() async {
                     style: TreeFormStyles.subtitleStyle(),
                   ),
                   const SizedBox(height: 20),
-                  CameraHandler(
-                    currentImageBase64: _controller.imageBase64,
-                    onImageSelected: (String base64String) {
-                      setState(() {
-                        _controller.imageBase64 = base64String.isNotEmpty 
-                            ? base64String 
-                            : null;
-                      });
-                    },
-                  ),
+CameraHandler(
+  currentImageBase64: _controller.imageBase64,
+  onImageSelected: (String base64String) {
+    setState(() {
+      _controller.imageBase64 = base64String.isNotEmpty 
+          ? base64String 
+          : null;
+    });
+  },
+  onCoordinatesFound: (longitude, latitude) {
+    if (longitude != null && latitude != null) {
+      setState(() {
+        _controller.coordinateXController.text = longitude.toStringAsFixed(6);
+        _controller.coordinateYController.text = latitude.toStringAsFixed(6);
+      });
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Đã lấy tọa độ từ ảnh thành công'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+  },
+),
                 ],
               ),
             ),
