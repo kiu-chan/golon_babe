@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:golon_babe/models/tree_model.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'tree_form_controller.dart';
 import 'tree_form_styles.dart';
 import 'tree_form_validator.dart';
@@ -172,28 +174,69 @@ class TreeFormWidgets {
     );
   }
 
-  static Widget buildSubmitButton(
-    TreeFormController controller,
-    VoidCallback onPressed,
-  ) {
-    return ElevatedButton(
-      onPressed: onPressed,
-      style: TreeFormStyles.submitButtonStyle(),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            controller.isEditing ? Icons.update : Icons.add_circle,
-            size: 24,
-            color: Colors.white,
+  static void _showPermissionDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Yêu cầu quyền truy cập'),
+        content: const Text('Ứng dụng cần quyền truy cập vị trí để lấy tọa độ'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Để sau'),
           ),
-          const SizedBox(width: 8),
-          Text(
-            controller.isEditing ? 'Cập nhật thông tin' : 'Thêm mới',
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            ),
+          TextButton(
+            onPressed: () {
+              Permission.location.request();
+              Navigator.pop(context);
+            },
+            child: const Text('Cấp quyền'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static void _showSettingsDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Cài đặt quyền truy cập'),
+        content: const Text('Vui lòng vào Cài đặt để cấp quyền truy cập vị trí cho ứng dụng'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Để sau'),
+          ),
+          TextButton(
+            onPressed: () {
+              openAppSettings();
+              Navigator.pop(context);
+            },
+            child: const Text('Mở Cài đặt'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static void _showLocationServiceDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Bật dịch vụ vị trí'),
+        content: const Text('Vui lòng bật GPS để lấy tọa độ chính xác'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Để sau'),
+          ),
+          TextButton(
+            onPressed: () {
+              Geolocator.openLocationSettings();
+              Navigator.pop(context);
+            },
+            child: const Text('Mở cài đặt'),
           ),
         ],
       ),
@@ -245,21 +288,101 @@ class TreeFormWidgets {
           enabled: false,
           prefixIcon: Icons.eco,
         ),
-        buildTextField(
-          controller: controller.coordinateXController,
-          label: 'Tọa độ x',
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          prefixIcon: Icons.location_on,
-          validator: (value) {
-            if (!TreeFormValidator.validateCoordinate(value)) {
-              return 'Vui lòng nhập số thập phân hợp lệ (tối đa 6 chữ số sau dấu phẩy)';
-            }
-            return null;
-          },
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: buildTextField(
+                controller: controller.coordinateXController,
+                label: 'Tọa độ x',
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                prefixIcon: Icons.location_on,
+                validator: (value) {
+                  if (!TreeFormValidator.validateCoordinate(value)) {
+                    return 'Vui lòng nhập số thập phân hợp lệ (tối đa 6 chữ số sau dấu phẩy)';
+                  }
+                  return null;
+                },
+              ),
+            ),
+            Center(
+              child: Builder(
+                builder: (context) => IconButton(
+                  onPressed: () async {
+                    try {
+                      final status = await Permission.location.status;
+                      if (status.isDenied) {
+                        final result = await Permission.location.request();
+                        if (!result.isGranted) {
+                          if (context.mounted) {
+                            _showPermissionDialog(context);
+                          }
+                          return;
+                        }
+                      }
+                              
+                      if (status.isPermanentlyDenied) {
+                        if (context.mounted) {
+                          _showSettingsDialog(context);
+                        }
+                        return;
+                      }
+                              
+                      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+                      if (!serviceEnabled) {
+                        if (context.mounted) {
+                          _showLocationServiceDialog(context);
+                        }
+                        return;
+                      }
+                              
+                      final position = await Geolocator.getCurrentPosition(
+                        desiredAccuracy: LocationAccuracy.high
+                      );
+                              
+                      controller.coordinateXController.text = position.longitude.toStringAsFixed(6);
+                      controller.coordinateYController.text = position.latitude.toStringAsFixed(6);
+                              
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Đã cập nhật tọa độ thành công'),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Lỗi khi lấy tọa độ: $e'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    }
+                  },
+                  icon: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.lightGreen,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      Icons.my_location,  
+                      color: Colors.white,
+                      size: 24,
+                    ),
+                  ),
+                  tooltip: 'Lấy tọa độ hiện tại',
+                ),
+              ),
+            ),
+          ],
         ),
         buildTextField(
           controller: controller.coordinateYController,
-          label: 'Tọa độ y',
+          label: 'Tọa độ y', 
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
           prefixIcon: Icons.location_on,
           validator: (value) {
@@ -311,5 +434,5 @@ class TreeFormWidgets {
         ),
       ],
     );
-  }
+  } 
 }
