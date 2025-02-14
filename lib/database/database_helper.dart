@@ -1,75 +1,82 @@
 import 'dart:io';
-
 import 'package:postgres/postgres.dart';
 import '../models/tree_model.dart';
+import '../config/env_config.dart';
 
 class DatabaseHelper {
+  // Singleton pattern implementation
   static final DatabaseHelper _instance = DatabaseHelper._internal();
   factory DatabaseHelper() => _instance;
   DatabaseHelper._internal();
 
+  // Class properties
   static PostgreSQLConnection? _connection;
   bool _isConnecting = false;
   static const int _maxRetries = 3;
-  static const _host = '163.44.193.74';
-  static const _port = 5432;
-  static const _database = 'caygolon_babe';
-  static const _username = 'postgres';
-  static const _password = '2W34pRi%AEzYtRy3QfF)tV';
 
+  // Environment variables getters
+  static String get _host => EnvConfig.dbHost;
+  static int get _port => EnvConfig.dbPort;
+  static String get _database => EnvConfig.dbName;
+  static String get _username => EnvConfig.dbUser;
+  static String get _password => EnvConfig.dbPassword;
+
+  // Get database connection
   Future<PostgreSQLConnection> get connection async {
     if (_connection != null && !_connection!.isClosed) {
       return _connection!;
     }
-
     return await _getConnection();
   }
 
-Future<PostgreSQLConnection> _getConnection() async {
-  if (_isConnecting) {
-    while (_isConnecting) {
-      await Future.delayed(const Duration(milliseconds: 100));
-    }
-    if (_connection != null && !_connection!.isClosed) {
-      return _connection!;
-    }
-  }
-
-  _isConnecting = true;
-  
-  try {
-    // Thử kết nối lần đầu
-    _connection = PostgreSQLConnection(
-      _host,
-      _port,
-      _database,
-      username: _username,
-      password: _password,
-      timeoutInSeconds: 5, // Giảm thời gian timeout xuống
-      queryTimeoutInSeconds: 5,
-      timeZone: 'UTC',
-      useSSL: false,
-    );
-
-    await _connection!.open();
-    _isConnecting = false;
-    print('Connected to database successfully');
-    return _connection!;
-
-  } catch (e) {
-    _isConnecting = false;
-    if (_connection != null) {
-      try {
-        await _connection!.close();
-      } catch (e) {
-        print('Error closing failed connection: $e');
+  // Connect to database with retry mechanism
+  Future<PostgreSQLConnection> _getConnection() async {
+    if (_isConnecting) {
+      while (_isConnecting) {
+        await Future.delayed(const Duration(milliseconds: 100));
       }
-      _connection = null;
+      if (_connection != null && !_connection!.isClosed) {
+        return _connection!;
+      }
     }
-    throw Exception('Failed to connect to database');
-  }
-}
 
+    _isConnecting = true;
+    
+    try {
+      print('Attempting to connect to database at $_host:$_port');
+      
+      _connection = PostgreSQLConnection(
+        _host,
+        _port,
+        _database,
+        username: _username,
+        password: _password,
+        timeoutInSeconds: 5,
+        queryTimeoutInSeconds: 5,
+        timeZone: 'UTC',
+        useSSL: false,
+      );
+
+      await _connection!.open();
+      _isConnecting = false;
+      print('Connected to database successfully');
+      return _connection!;
+
+    } catch (e) {
+      _isConnecting = false;
+      if (_connection != null) {
+        try {
+          await _connection!.close();
+        } catch (e) {
+          print('Error closing failed connection: $e');
+        }
+        _connection = null;
+      }
+      throw Exception('Failed to connect to database: $e');
+    }
+  }
+
+  // Get master tree information
   Future<List<Map<String, dynamic>>> getMasterTreeInfo() async {
     int retryCount = 0;
     while (retryCount < _maxRetries) {
@@ -94,6 +101,7 @@ Future<PostgreSQLConnection> _getConnection() async {
     throw Exception('Unexpected error in getMasterTreeInfo');
   }
 
+  // Get master tree info by ID
   Future<Map<String, dynamic>?> getMasterTreeInfoById(int id) async {
     int retryCount = 0;
     while (retryCount < _maxRetries) {
@@ -120,6 +128,7 @@ Future<PostgreSQLConnection> _getConnection() async {
     return null;
   }
 
+  // Get all tree details
   Future<List<Map<String, dynamic>>> getTreeDetails() async {
     int retryCount = 0;
     while (retryCount < _maxRetries) {
@@ -151,18 +160,9 @@ Future<PostgreSQLConnection> _getConnection() async {
     throw Exception('Unexpected error in getTreeDetails');
   }
 
-Future<Map<String, dynamic>?> getTreeDetailsById(int id) async {
-  // Thêm tham số để kiểm tra đã thử kết nối lần đầu chưa
-  bool hasTriedConnection = false;
-  
-  int retryCount = 0;
-  while (retryCount < _maxRetries) {
+  // Get tree details by ID
+  Future<Map<String, dynamic>?> getTreeDetailsById(int id) async {
     try {
-      // Nếu đã thử kết nối một lần và thất bại, không thử lại nữa
-      if (hasTriedConnection) {
-        return null;
-      }
-      
       final conn = await connection;
       final results = await conn.mappedResultsQuery('''
         SELECT td.*, mti.tree_type, mti.scientific_name, mti.tay_name,
@@ -178,26 +178,15 @@ Future<Map<String, dynamic>?> getTreeDetailsById(int id) async {
         ...results.first['master_tree_info']!,
       };
     } catch (e) {
-      hasTriedConnection = true;
-      retryCount++;
-      print('Error getting tree details by id (attempt $retryCount): $e');
-      
-      // Nếu là lỗi kết nối, không thử lại
+      print('Error getting tree details by id: $e');
       if (e is SocketException) {
-        return null;
+        await _reconnectIfNeeded();
       }
-      
-      if (retryCount >= _maxRetries) {
-        return null;
-      }
-      
-      await Future.delayed(Duration(seconds: retryCount));
-      await _reconnectIfNeeded();
+      return null;
     }
   }
-  return null;
-}
 
+  // Insert new tree detail
   Future<bool> insertTreeDetail({
     required int masterTreeId,
     required Map<String, dynamic> details,
@@ -207,7 +196,7 @@ Future<Map<String, dynamic>?> getTreeDetailsById(int id) async {
       try {
         final conn = await connection;
         await conn.transaction((ctx) async {
-          // Kiểm tra master tree tồn tại
+          // Check if master tree exists
           final masterTree = await ctx.query(
             'SELECT id FROM master_tree_info WHERE id = @id',
             substitutionValues: {'id': masterTreeId},
@@ -254,6 +243,7 @@ Future<Map<String, dynamic>?> getTreeDetailsById(int id) async {
     return false;
   }
 
+  // Update existing tree detail
   Future<bool> updateTreeDetail({
     required int id,
     required Map<String, dynamic> details,
@@ -303,6 +293,7 @@ Future<Map<String, dynamic>?> getTreeDetailsById(int id) async {
     return false;
   }
 
+  // Save tree details (insert or update)
   Future<bool> saveTreeDetails(TreeDetails details) async {
     try {
       if (details.id != null) {
@@ -322,6 +313,7 @@ Future<Map<String, dynamic>?> getTreeDetailsById(int id) async {
     }
   }
 
+  // Delete tree detail
   Future<bool> deleteTreeDetail(int id) async {
     int retryCount = 0;
     while (retryCount < _maxRetries) {
@@ -347,6 +339,55 @@ Future<Map<String, dynamic>?> getTreeDetailsById(int id) async {
     return false;
   }
 
+  // Test database connection
+  Future<bool> testConnection() async {
+    try {
+      print('Testing database connection...');
+      
+      // Close existing connection if any
+      if (_connection != null) {
+        try {
+          await _connection!.close();
+        } catch (e) {
+          print('Error closing existing connection: $e');
+        }
+        _connection = null;
+        _isConnecting = false;
+      }
+
+      // Try new connection
+      _connection = PostgreSQLConnection(
+        _host,
+        _port,
+        _database,
+        username: _username,
+        password: _password,
+        timeoutInSeconds: 5,
+        queryTimeoutInSeconds: 5,
+        timeZone: 'UTC',
+        useSSL: false,
+      );
+
+      await _connection!.open();
+      await _connection!.query('SELECT 1');
+      print('Database connection test successful');
+      return true;
+    } catch (e) {
+      print('Database connection test failed: $e');
+      if (_connection != null) {
+        try {
+          await _connection!.close();
+        } catch (e) {
+          print('Error closing failed connection: $e');
+        }
+        _connection = null;
+        _isConnecting = false;
+      }
+      return false;
+    }
+  }
+
+  // Reconnect if needed
   Future<void> _reconnectIfNeeded() async {
     if (_connection != null) {
       try {
@@ -358,53 +399,7 @@ Future<Map<String, dynamic>?> getTreeDetailsById(int id) async {
     }
   }
 
-Future<bool> testConnection() async {
-  try {
-    print('Bắt đầu kiểm tra kết nối database...');
-    
-    // Đóng kết nối cũ nếu có
-    if (_connection != null) {
-      try {
-        await _connection!.close();
-      } catch (e) {
-        print('Lỗi đóng kết nối cũ: $e');
-      }
-      _connection = null;
-      _isConnecting = false;
-    }
-
-    // Thử tạo kết nối mới
-    _connection = PostgreSQLConnection(
-      _host,
-      _port,
-      _database,
-      username: _username,
-      password: _password,
-      timeoutInSeconds: 5,
-      queryTimeoutInSeconds: 5,
-      timeZone: 'UTC',
-      useSSL: false,
-    );
-
-    await _connection!.open();
-    await _connection!.query('SELECT 1');
-    print('Kiểm tra kết nối thành công');
-    return true;
-  } catch (e) {
-    print('Kiểm tra kết nối thất bại: $e');
-    if (_connection != null) {
-      try {
-        await _connection!.close();
-      } catch (e) {
-        print('Lỗi đóng kết nối lỗi: $e');
-      }
-      _connection = null;
-      _isConnecting = false;
-    }
-    return false;
-  }
-}
-
+  // Close database connection
   Future<void> close() async {
     if (_connection != null && !_connection!.isClosed) {
       await _connection!.close();

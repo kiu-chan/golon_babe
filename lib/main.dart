@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:golon_babe/app.dart';
+import 'package:golon_babe/config/env_config.dart';
 import 'package:golon_babe/services/background_service.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await EnvConfig.initialize();
 
   // Khởi tạo notification
   final flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
