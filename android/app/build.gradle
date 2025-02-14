@@ -1,17 +1,17 @@
 def localProperties = new Properties()
 def localPropertiesFile = rootProject.file('local.properties')
 if (localPropertiesFile.exists()) {
-    localPropertiesFile.withReader('UTF-8') { reader ->
-        localProperties.load(reader)
-    }
+   localPropertiesFile.withReader('UTF-8') { reader ->
+       localProperties.load(reader)
+   }
 }
 
 def flutterRoot = localProperties.getProperty('flutter.sdk')
 if (flutterRoot == null) {
-    throw new GradleException("Flutter SDK not found. Define location with flutter.sdk in the local.properties file.")
+   throw new GradleException("Flutter SDK not found. Define location with flutter.sdk in the local.properties file.")
 }
 
-def flutterVersionCode = '1'
+def flutterVersionCode = '2'
 def flutterVersionName = '1.0'
 
 apply plugin: 'com.android.application'
@@ -21,79 +21,94 @@ apply from: "$flutterRoot/packages/flutter_tools/gradle/flutter.gradle"
 def keystoreProperties = new Properties()
 def keystorePropertiesFile = rootProject.file('key.properties')
 if (keystorePropertiesFile.exists()) {
-    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+   keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
 }
 
 android {
-    namespace "com.mon.golon_babe"
-    compileSdkVersion flutter.compileSdkVersion
-    ndkVersion flutter.ndkVersion
+   namespace "com.mon.golon_babe"
+   compileSdkVersion flutter.compileSdkVersion
+   ndkVersion flutter.ndkVersion
 
-    compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
-    }
+   compileOptions {
+       sourceCompatibility JavaVersion.VERSION_1_8
+       targetCompatibility JavaVersion.VERSION_1_8
+   }
 
-    kotlinOptions {
-        jvmTarget = '1.8'
-    }
+   kotlinOptions {
+       jvmTarget = '1.8'
+   }
 
-    sourceSets {
-        main.java.srcDirs += 'src/main/kotlin'
-    }
+   sourceSets {
+       main.java.srcDirs += 'src/main/kotlin'
+   }
 
-    defaultConfig {
-        applicationId "com.mon.golon_babe"
-        minSdkVersion flutter.minSdkVersion
-        targetSdkVersion flutter.targetSdkVersion
-        versionCode flutterVersionCode.toInteger()
-        versionName flutterVersionName
-        multiDexEnabled true
-    }
+   defaultConfig {
+       applicationId "com.mon.golon_babe"
+       minSdkVersion flutter.minSdkVersion
+       targetSdkVersion flutter.targetSdkVersion
+       versionCode flutterVersionCode.toInteger()
+       versionName flutterVersionName
+       multiDexEnabled true
+   }
 
-    signingConfigs {
-        if (keystorePropertiesFile.exists()) {
-            release {
-                keyAlias keystoreProperties['keyAlias']
-                keyPassword keystoreProperties['keyPassword']
-                storeFile file(keystoreProperties['storeFile'])
-                storePassword keystoreProperties['storePassword']
-            }
-        }
-    }
+   signingConfigs {
+       if (keystorePropertiesFile.exists()) {
+           release {
+               keyAlias keystoreProperties['keyAlias']
+               keyPassword keystoreProperties['keyPassword']
+               storeFile file(keystoreProperties['storeFile'])
+               storePassword keystoreProperties['storePassword']
+           }
+       }
+   }
 
-    buildTypes {
-        release {
-            if (keystorePropertiesFile.exists()) {
-                signingConfig signingConfigs.release
-            }
-            minifyEnabled true
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-            shrinkResources true
-        }
-        debug {
-            signingConfig signingConfigs.debug
-        }
-    }
+   buildTypes {
+       release {
+           if (keystorePropertiesFile.exists()) {
+               signingConfig signingConfigs.release
+           }
+           minifyEnabled true
+           proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+           shrinkResources true
+       }
+       debug {
+           signingConfig signingConfigs.debug
+       }
+   }
 
-    lint {
-        disable 'InvalidPackage'
-    }
+   lint {
+       disable 'InvalidPackage'
+   }
+
+   dexOptions {
+       javaMaxHeapSize "4g"
+   }
+   
+   configurations.all {
+       resolutionStrategy {
+           force 'com.google.android.play:feature-delivery:2.1.0'
+       }
+   }
 }
 
 flutter {
-    source '../..'
+   source '../..'
 }
 
 dependencies {
-    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
-    implementation 'androidx.work:work-runtime-ktx:2.8.1'
-    implementation 'androidx.window:window:1.0.0'
-    implementation 'androidx.window:window-java:1.0.0'
-    implementation 'androidx.multidex:multidex:2.0.1'
-    implementation 'com.google.android.play:core:1.10.3'
-    implementation 'com.google.android.play:core-ktx:1.8.1'
-    implementation 'com.google.android.material:material:1.9.0'
-    implementation 'androidx.core:core-ktx:1.10.1'
-    implementation 'androidx.annotation:annotation:1.6.0'
+   implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
+   implementation 'androidx.work:work-runtime-ktx:2.8.1'
+   implementation 'androidx.window:window:1.0.0'
+   implementation 'androidx.window:window-java:1.0.0'
+   implementation 'androidx.multidex:multidex:2.0.1'
+   
+   // Thêm cả feature-delivery
+   implementation 'com.google.android.play:app-update:2.1.0'
+   implementation 'com.google.android.play:app-update-ktx:2.1.0'
+   implementation 'com.google.android.play:feature-delivery:2.1.0'
+   implementation 'com.google.android.play:feature-delivery-ktx:2.1.0'
+   
+   implementation 'com.google.android.material:material:1.9.0'
+   implementation 'androidx.core:core-ktx:1.10.1'
+   implementation 'androidx.annotation:annotation:1.6.0'
 }
