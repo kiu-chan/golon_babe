@@ -6,18 +6,20 @@
 	<string>Ứng dụng cần quyền truy cập vị trí để lấy tọa độ hiện tại của cây</string>
 	<key>NSLocationAlwaysUsageDescription</key>
 	<string>Ứng dụng cần quyền truy cập vị trí để lấy tọa độ hiện tại của cây</string>
-    <key>NSUserNotificationAlertStyle</key>
-    <string>alert</string>
-    <key>NSUserNotificationUsageDescription</key>
-    <string>Chúng tôi cần gửi thông báo để cập nhật thông tin cho bạn</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Ứng dụng cần quyền truy cập vị trí để lấy tọa độ cây</string>
+	<key>NSUserNotificationAlertStyle</key>
+	<string>alert</string>
+	<key>NSUserNotificationUsageDescription</key>
+	<string>Chúng tôi cần gửi thông báo để cập nhật thông tin cho bạn</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Ứng dụng cần quyền truy cập máy ảnh để chụp ảnh cây</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Ứng dụng cần quyền truy cập thư viện ảnh để chọn ảnh cây</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Ứng dụng cần quyền ghi vào thư viện ảnh để lưu ảnh cây</string>
-    <key>NSMicrophoneUsageDescription</key>
-    <string>Ứng dụng cần truy cập microphone để quay video</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Ứng dụng cần truy cập microphone để quay video</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>

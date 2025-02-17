@@ -174,73 +174,48 @@ class TreeFormWidgets {
     );
   }
 
-  static void _showPermissionDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Yêu cầu quyền truy cập'),
-        content: const Text('Ứng dụng cần quyền truy cập vị trí để lấy tọa độ'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Để sau'),
-          ),
-          TextButton(
-            onPressed: () {
-              Permission.location.request();
-              Navigator.pop(context);
-            },
-            child: const Text('Cấp quyền'),
-          ),
-        ],
-      ),
-    );
-  }
+  static Future<bool> _handleLocationPermission(BuildContext context) async {
+    bool serviceEnabled;
+    LocationPermission permission;
 
-  static void _showSettingsDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Cài đặt quyền truy cập'),
-        content: const Text('Vui lòng vào Cài đặt để cấp quyền truy cập vị trí cho ứng dụng'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Để sau'),
-          ),
-          TextButton(
-            onPressed: () {
-              openAppSettings();
-              Navigator.pop(context);
-            },
-            child: const Text('Mở Cài đặt'),
-          ),
-        ],
-      ),
-    );
-  }
+    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Vui lòng bật dịch vụ vị trí trên thiết bị'),
+          backgroundColor: Colors.orange,
+        ));
+      }
+      return false;
+    }
 
-  static void _showLocationServiceDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Bật dịch vụ vị trí'),
-        content: const Text('Vui lòng bật GPS để lấy tọa độ chính xác'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Để sau'),
+    permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Quyền truy cập vị trí bị từ chối'),
+            backgroundColor: Colors.red,
+          ));
+        }
+        return false;
+      }
+    }
+
+    if (permission == LocationPermission.deniedForever) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text(
+            'Quyền truy cập vị trí bị từ chối vĩnh viễn, vui lòng cấp quyền trong Cài đặt',
           ),
-          TextButton(
-            onPressed: () {
-              Geolocator.openLocationSettings();
-              Navigator.pop(context);
-            },
-            child: const Text('Mở cài đặt'),
-          ),
-        ],
-      ),
-    );
+          backgroundColor: Colors.red,
+        ));
+      }
+      return false;
+    }
+
+    return true;
   }
 
   static Widget buildDetailFields(TreeFormController controller) {
@@ -310,46 +285,22 @@ class TreeFormWidgets {
                 builder: (context) => IconButton(
                   onPressed: () async {
                     try {
-                      final status = await Permission.location.status;
-                      if (status.isDenied) {
-                        final result = await Permission.location.request();
-                        if (!result.isGranted) {
-                          if (context.mounted) {
-                            _showPermissionDialog(context);
-                          }
-                          return;
-                        }
-                      }
-                              
-                      if (status.isPermanentlyDenied) {
-                        if (context.mounted) {
-                          _showSettingsDialog(context);
-                        }
-                        return;
-                      }
-                              
-                      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-                      if (!serviceEnabled) {
-                        if (context.mounted) {
-                          _showLocationServiceDialog(context);
-                        }
-                        return;
-                      }
-                              
-                      final position = await Geolocator.getCurrentPosition(
-                        desiredAccuracy: LocationAccuracy.high
-                      );
-                              
-                      controller.coordinateXController.text = position.longitude.toStringAsFixed(6);
-                      controller.coordinateYController.text = position.latitude.toStringAsFixed(6);
-                              
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Đã cập nhật tọa độ thành công'),
-                            backgroundColor: Colors.green,
-                          ),
+                      if (await _handleLocationPermission(context)) {
+                        final position = await Geolocator.getCurrentPosition(
+                          desiredAccuracy: LocationAccuracy.high
                         );
+                        
+                        controller.coordinateXController.text = position.longitude.toStringAsFixed(6);
+                        controller.coordinateYController.text = position.latitude.toStringAsFixed(6);
+                        
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Đã cập nhật tọa độ thành công'),
+                              backgroundColor: Colors.green,
+                            ),
+                          );
+                        }
                       }
                     } catch (e) {
                       if (context.mounted) {
@@ -434,5 +385,5 @@ class TreeFormWidgets {
         ),
       ],
     );
-  } 
+  }
 }
