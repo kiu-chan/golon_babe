@@ -32,7 +32,7 @@ void callbackDispatcher() {
       }
 
       final localDb = SQLiteHelper();
-      final remoteDb = DatabaseHelper();
+      final remoteDb = PostgresHelper();
       
       // Kiểm tra kết nối database
       bool isConnected = false;
