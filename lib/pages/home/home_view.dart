@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:golon_babe/models/tree_model.dart';
+import 'package:golon_babe/pages/account/login_page.dart';
 import 'package:golon_babe/repositories/tree_repository.dart';
 import 'package:golon_babe/widgets/tree_form/tree_form.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class HomeView extends StatelessWidget {
   final List<MasterTreeInfo> masterTreeList;
@@ -41,36 +43,49 @@ class HomeView extends StatelessWidget {
     );
   }
 
-  PreferredSizeWidget _buildAppBar(BuildContext context) {
-    return AppBar(
-      title: const Text(
-        'Quản lý cây gỗ lớn Ba Bể',
-        style: TextStyle(fontWeight: FontWeight.bold),
+PreferredSizeWidget _buildAppBar(BuildContext context) {
+  return AppBar(
+    title: const Text(
+      'Quản lý cây gỗ lớn Ba Bể',
+      style: TextStyle(fontWeight: FontWeight.bold),
+    ),
+    centerTitle: true,
+    backgroundColor: Colors.lightGreen[200],
+    elevation: 0,
+    actions: [
+      if (!isOnline)
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 8),
+          child: Icon(Icons.offline_bolt, color: Colors.orange),
+        ),
+      IconButton(
+        icon: const Icon(Icons.sync),
+        onPressed: !isOnline || isSyncing || isLoading 
+          ? null 
+          : onSync,
+        tooltip: 'Đồng bộ dữ liệu',
       ),
-      centerTitle: true,
-      backgroundColor: Colors.lightGreen[200],
-      elevation: 0,
-      actions: [
-        if (!isOnline)
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 8),
-            child: Icon(Icons.offline_bolt, color: Colors.orange),
-          ),
-        IconButton(
-          icon: const Icon(Icons.sync),
-          onPressed: !isOnline || isSyncing || isLoading 
-            ? null 
-            : onSync,
-          tooltip: 'Đồng bộ dữ liệu',
-        ),
-        IconButton(
-          icon: const Icon(Icons.refresh),
-          onPressed: isLoading ? null : onRefresh,
-          tooltip: 'Làm mới dữ liệu',
-        ),
-      ],
-    );
-  }
+      IconButton(
+        icon: const Icon(Icons.refresh),
+        onPressed: isLoading ? null : onRefresh,
+        tooltip: 'Làm mới dữ liệu',
+      ),
+      IconButton(
+        icon: const Icon(Icons.logout),
+        onPressed: () async {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setBool('isLoggedIn', false);
+          if (context.mounted) {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(builder: (context) => const LoginPage()),
+            );
+          }
+        },
+        tooltip: 'Đăng xuất',
+      ),
+    ],
+  );
+}
 
   Widget _buildLoadingView() {
     return Center(

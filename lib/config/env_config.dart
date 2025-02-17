@@ -11,6 +11,13 @@ class EnvConfig {
   static String get dbUser => _getEnvVar('DB_USER', defaultValue: 'postgres');
   static String get dbPassword => _getEnvVar('DB_PASSWORD', defaultValue: '');
 
+  // Admin configurations
+  static String get adminUsername => _getEnvVar('ADMIN_USERNAME', defaultValue: 'admin');
+  static String get adminPassword => _getEnvVar('ADMIN_PASSWORD', defaultValue: '123456');
+
+  // API configurations
+  static String get apiUrl => _getEnvVar('API_URL', defaultValue: 'http://localhost:8080');
+
   // Helper method to safely get environment variables
   static String _getEnvVar(String key, {required String defaultValue}) {
     try {
@@ -43,7 +50,17 @@ class EnvConfig {
 
   // Validate required environment variables
   static void _validateEnvironmentVariables() {
-    final requiredVars = ['DB_HOST', 'DB_PORT', 'DB_NAME', 'DB_USER', 'DB_PASSWORD'];
+    final requiredVars = [
+      'DB_HOST', 
+      'DB_PORT', 
+      'DB_NAME', 
+      'DB_USER', 
+      'DB_PASSWORD',
+      'ADMIN_USERNAME',
+      'ADMIN_PASSWORD',
+      'API_URL'
+    ];
+    
     final missingVars = requiredVars.where((var_) => dotenv.env[var_]?.isEmpty ?? true).toList();
     
     if (missingVars.isNotEmpty) {
