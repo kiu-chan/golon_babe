@@ -210,52 +210,52 @@ _localAdditionalImages = SQLiteAdditionalImages(SQLiteCore());
     }
   }
 
+
 Future<List<TreeAdditionalImage>> getAdditionalImages(int treeId) async {
   try {
     print('\n=== LẤY DANH SÁCH ẢNH PHỤ ===');
-    print('Tree Detail ID ban đầu: $treeId');
+    print('Tree ID ban đầu: $treeId');
     
-    // Lấy chi tiết cây để xác nhận ID
+    final isConnected = await hasInternetConnection();
+    print('Trạng thái kết nối: ${isConnected ? "Online" : "Offline"}');
+    
+    // Lấy chi tiết cây để xác nhận đúng ID
     final treeDetail = await getTreeDetailsById(treeId);
     if (treeDetail == null) {
       print('Không tìm thấy thông tin cây ID: $treeId');
       return [];
     }
-    
-    final actualTreeId = treeDetail.id ?? treeId;
-    print('Tree Detail ID thực tế sẽ dùng: $actualTreeId');
-    
-    final isConnected = await hasInternetConnection();
-    print('Trạng thái kết nối: ${isConnected ? "Online" : "Offline"}');
+
+    final correctId = treeDetail.id ?? treeId;
+    print('ID cây sẽ sử dụng để tìm ảnh phụ: $correctId');
     
     if (isConnected) {
       print('Online - Lấy ảnh phụ từ server...');
-      final remoteImages = await _remoteAdditionalImages.getImagesByTreeId(actualTreeId);
+      final remoteImages = await _remoteAdditionalImages.getImagesByTreeId(correctId);
       print('Đã lấy ${remoteImages.length} ảnh phụ từ server');
       
-      // Lưu vào local
+      // Lưu lại vào local
       print('Đang lưu ảnh phụ vào local...');
       for (var image in remoteImages) {
-        final localId = await _localAdditionalImages.saveImage(
-          TreeAdditionalImage(
-            treeDetailId: actualTreeId,
-            imageBase64: image.imageBase64,
-            id: image.id,
-            createdAt: image.createdAt,
-          )
+        final localImage = TreeAdditionalImage(
+          treeDetailId: correctId,
+          imageBase64: image.imageBase64,
+          id: image.id,
+          createdAt: image.createdAt,
         );
+        final localId = await _localAdditionalImages.saveImage(localImage);
         await _localAdditionalImages.markAsSynced(localId);
+        print('Đã lưu ảnh phụ với ID $localId vào local');
       }
-      print('Đã lưu xong ảnh phụ vào local');
       
       return remoteImages;
     }
     
     print('Offline - Lấy ảnh phụ từ local...');
-    final localImages = await _localAdditionalImages.getImagesByTreeId(actualTreeId);
+    final localImages = await _localAdditionalImages.getImagesByTreeId(correctId);
     print('Đã lấy ${localImages.length} ảnh phụ từ local');
-    return localImages;
     
+    return localImages;
   } catch (e) {
     print('Lỗi khi lấy ảnh phụ: $e');
     print('Stack trace: ${StackTrace.current}');

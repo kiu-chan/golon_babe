@@ -14,21 +14,14 @@ Future<List<TreeAdditionalImage>> getImagesByTreeId(int treeId) async {
     
     final db = await _core.database;
     
-    // In ra cấu trúc bảng để debug
-    final tableInfo = await db.query('sqlite_master', 
-      where: 'type = ? AND name = ?',
-      whereArgs: ['table', 'tree_additional_images']
-    );
-    print('Cấu trúc bảng tree_additional_images:');
-    print(tableInfo.first['sql']);
-    
-    // Kiểm tra dữ liệu hiện có
+    // Debug: In ra tất cả ảnh phụ
     final allImages = await db.query('tree_additional_images');
     print('Tổng số ảnh phụ trong database: ${allImages.length}');
+    print('Danh sách tất cả ảnh:');
     for (var img in allImages) {
-      print('ID: ${img['id']}, Tree Detail ID: ${img['tree_detail_id']}');
+      print('- ID: ${img['id']}, Tree ID: ${img['tree_detail_id']}, Sync: ${img['sync_status']}');
     }
-    
+
     // Lấy ảnh theo tree_detail_id
     final results = await db.query(
       'tree_additional_images',
@@ -37,11 +30,28 @@ Future<List<TreeAdditionalImage>> getImagesByTreeId(int treeId) async {
       orderBy: 'created_at DESC',
     );
     
-    print('Tìm thấy ${results.length} ảnh phụ cho cây ID $treeId');
+    print('Tìm thấy ${results.length} ảnh phụ cho tree_detail_id: $treeId');
     
-    final images = results.map((map) => TreeAdditionalImage.fromJson(map)).toList();
-    print('Đã chuyển đổi thành công sang đối tượng TreeAdditionalImage');
+    if (results.isEmpty) {
+      print('Thử tìm kiếm lại với điều kiện khác...');
+      // Thử tìm theo master_tree_id từ bảng tree_details
+      final treeDetail = await db.query(
+        'tree_details',
+        where: 'id = ?',
+        whereArgs: [treeId],
+      );
+      
+      if (treeDetail.isNotEmpty) {
+        print('Tìm thấy thông tin cây: ID=${treeDetail.first['id']}, Master ID=${treeDetail.first['master_tree_id']}');
+      }
+    }
+
+    final images = results.map((map) {
+      print('Chuyển đổi ảnh: ID=${map['id']}, Size=${map['image_base64'].toString().length}');
+      return TreeAdditionalImage.fromJson(map);
+    }).toList();
     
+    print('Đã chuyển đổi thành công ${images.length} ảnh');
     return images;
   } catch (e) {
     print('Lỗi khi lấy ảnh phụ từ SQLite:');

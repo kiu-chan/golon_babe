@@ -85,53 +85,49 @@ class TreeFormController {
    }
  }
 
- Future<bool> searchTreeById(String id) async {
-   try {
-     final idNumber = int.tryParse(id);
-     if (idNumber == null) return false;
-     
-     print('\n=== BẮT ĐẦU TÌM KIẾM CÂY ===');
-     print('ID người dùng nhập: $id'); 
-     print('ID đã parse: $idNumber');
-     print('ID đang sửa hiện tại: $editingId');
-     
-     final isOnline = await _repository.hasInternetConnection();
-     print('Trạng thái kết nối: ${isOnline ? "Online" : "Offline"}');
-
-     final treeDetails = await _repository.getTreeDetailsById(idNumber);
-     
-     if (treeDetails != null) {
-       print('Đã tìm thấy cây:');
-       print('ID cây: ${treeDetails.id}');
-       print('ID loại cây: ${treeDetails.masterTreeId}');
-       
-       isEditing = true;
-       editingId = idNumber;
-       print('Đã set editingId = $editingId');
-       
-       _updateFormWithTreeDetails(treeDetails);
-       
-       // Load ảnh phụ 
-       if (treeDetails.id != null) {
-         additionalImages = await _repository.getAdditionalImages(treeDetails.id!);
-       }
-       
-       return true;
-     }
-     
-     print('Không tìm thấy cây ID: $idNumber');
-     resetForm();
-     return false;
-     
-   } catch (e) {
-     print('Lỗi khi tìm kiếm cây:');
-     print(e.toString());
-     print('Stack trace:');
-     print(StackTrace.current);
-     resetForm();
-     return false;
-   }
- }
+Future<bool> searchTreeById(String id) async {
+  try {
+    final idNumber = int.tryParse(id);
+    if (idNumber == null) return false;
+    
+    print('\n=== BẮT ĐẦU TÌM KIẾM CÂY ===');
+    print('ID người dùng nhập: $id'); 
+    print('ID đã parse: $idNumber');
+    print('ID đang sửa hiện tại: $editingId');
+    
+    final treeDetails = await _repository.getTreeDetailsById(idNumber);
+    
+    if (treeDetails != null) {
+      print('Đã tìm thấy cây:');
+      print('ID cây: ${treeDetails.id}');
+      print('Master Tree ID: ${treeDetails.masterTreeId}');
+      
+      isEditing = true;
+      editingId = treeDetails.id ?? idNumber;  // Sử dụng ID thực tế
+      print('Đã set editingId = $editingId');
+      
+      _updateFormWithTreeDetails(treeDetails);
+      
+      // Load ảnh phụ
+      if (editingId != null) {
+        print('Đang tải ảnh phụ cho cây ID: $editingId');
+        additionalImages = await _repository.getAdditionalImages(editingId!);
+        print('Đã tải ${additionalImages.length} ảnh phụ');
+      }
+      
+      return true;
+    }
+    
+    print('Không tìm thấy cây ID: $idNumber');
+    return false;
+  } catch (e) {
+    print('Lỗi khi tìm kiếm cây:');
+    print(e.toString());
+    print('Stack trace:');
+    print(StackTrace.current);
+    return false;
+  }
+}
 
  void _updateFormWithTreeDetails(TreeDetails tree) {
    print('\n=== CẬP NHẬT FORM VỚI DỮ LIỆU CÂY ==='); 
