@@ -40,47 +40,53 @@ class _TreeFormState extends State<TreeForm> {
     _loadMasterTreeList();
   }
 
-  Future<void> _setupConnectivity() async {
-    try {
-      final connectivity = Connectivity();
-      final result = await connectivity.checkConnectivity();
-      final hasConnection = result != ConnectivityResult.none;
-      final isConnected = hasConnection ? await widget.repository.hasInternetConnection() : false;
+Future<void> _setupConnectivity() async {
+  try {
+    final connectivity = Connectivity();
+    final result = await connectivity.checkConnectivity();
+    final hasConnection = result != ConnectivityResult.none;
+    final isConnected = hasConnection ? await widget.repository.hasInternetConnection() : false;
+    
+    if (mounted) {
+      setState(() => _isOnline = isConnected);
+      if (isConnected != _isOnline) {
+        _showConnectivitySnackBar();
+        if (isConnected) {
+          print('Kết nối mạng đã khôi phục - Bắt đầu đồng bộ...');
+          await widget.repository.syncData();
+        }
+      }
+    }
+
+    connectivity.onConnectivityChanged.listen((result) async {
+      if (!mounted) return;
       
-      if (mounted) {
-        setState(() => _isOnline = isConnected);
-        if (isConnected != _isOnline) {
+      final hasConnection = result != ConnectivityResult.none;
+      if (hasConnection) {
+        final isConnected = await widget.repository.hasInternetConnection();
+        if (mounted && isConnected != _isOnline) {
+          setState(() => _isOnline = isConnected);
+          _showConnectivitySnackBar();
+          if (isConnected) {
+            print('Kết nối mạng đã khôi phục - Bắt đầu đồng bộ...');
+            await widget.repository.syncData();
+            await _loadMasterTreeList();
+          }
+        }
+      } else {
+        if (mounted && _isOnline) {
+          setState(() => _isOnline = false);
           _showConnectivitySnackBar();
         }
       }
-
-      connectivity.onConnectivityChanged.listen((result) async {
-        if (!mounted) return;
-        
-        final hasConnection = result != ConnectivityResult.none;
-        if (hasConnection) {
-          final isConnected = await widget.repository.hasInternetConnection();
-          if (mounted && isConnected != _isOnline) {
-            setState(() => _isOnline = isConnected);
-            _showConnectivitySnackBar();
-            if (isConnected) {
-              await _loadMasterTreeList();
-            }
-          }
-        } else {
-          if (mounted && _isOnline) {
-            setState(() => _isOnline = false);
-            _showConnectivitySnackBar();
-          }
-        }
-      });
-    } catch (e) {
-      print('Lỗi kiểm tra kết nối: $e');
-      if (mounted) {
-        setState(() => _isOnline = false);
-      }
+    });
+  } catch (e) {
+    print('Lỗi kiểm tra kết nối: $e');
+    if (mounted) {
+      setState(() => _isOnline = false);
     }
   }
+}
 
   Future<void> _loadMasterTreeList() async {
     try {

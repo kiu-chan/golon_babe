@@ -313,28 +313,30 @@ Future<bool> saveAdditionalImage(TreeAdditionalImage image) async {
     }
   }
 
-  Future<void> syncData() async {
-    if (_isSyncing || !await hasInternetConnection()) {
-      print('Đang đồng bộ hoặc không có mạng, bỏ qua');
-      return;
-    }
-
-    _isSyncing = true;
-    try {
-      print('\n=== BẮT ĐẦU ĐỒNG BỘ DỮ LIỆU ===');
-      
-      await _syncRepo.syncData();
-      await getAllTreeDetailsAndSaveLocal();
-      
-      print('=== HOÀN THÀNH ĐỒNG BỘ DỮ LIỆU ===\n');
-      
-    } catch (e) {
-      print('Lỗi trong quá trình đồng bộ: $e');
-      _isOnline = false;
-    } finally {
-      _isSyncing = false;
-    }
+Future<void> syncData() async {
+  if (_isSyncing || !await hasInternetConnection()) {
+    print('Đang đồng bộ hoặc không có mạng, bỏ qua');
+    return;
   }
+
+  _isSyncing = true;
+  try {
+    print('\n=== BẮT ĐẦU ĐỒNG BỘ DỮ LIỆU ===');
+    
+    await _syncRepo.syncData();
+    await getAllTreeDetailsAndSaveLocal();
+    
+    // Sau khi đồng bộ, cập nhật lại trạng thái online
+    _isOnline = true;
+    print('=== HOÀN THÀNH ĐỒNG BỘ DỮ LIỆU ===\n');
+    
+  } catch (e) {
+    print('Lỗi trong quá trình đồng bộ: $e');
+    _isOnline = false;
+  } finally {
+    _isSyncing = false;
+  }
+}
 
   bool get isSyncing => _isSyncing;
   bool get isOnline => _isOnline;

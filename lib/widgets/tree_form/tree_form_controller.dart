@@ -103,14 +103,14 @@ Future<bool> searchTreeById(String id) async {
       print('Master Tree ID: ${treeDetails.masterTreeId}');
       
       isEditing = true;
-      editingId = treeDetails.id ?? idNumber;  // Sử dụng ID thực tế
+      editingId = treeDetails.id; // Lưu ID của tree_details
       print('Đã set editingId = $editingId');
       
       _updateFormWithTreeDetails(treeDetails);
       
-      // Load ảnh phụ
+      // Load ảnh phụ với tree_details ID
       if (editingId != null) {
-        print('Đang tải ảnh phụ cho cây ID: $editingId');
+        print('Đang tải ảnh phụ cho tree detail ID: $editingId'); 
         additionalImages = await _repository.getAdditionalImages(editingId!);
         print('Đã tải ${additionalImages.length} ảnh phụ');
       }
@@ -119,37 +119,37 @@ Future<bool> searchTreeById(String id) async {
     }
     
     print('Không tìm thấy cây ID: $idNumber');
+    resetForm();
     return false;
   } catch (e) {
-    print('Lỗi khi tìm kiếm cây:');
-    print(e.toString());
-    print('Stack trace:');
-    print(StackTrace.current);
+    print('Lỗi khi tìm kiếm cây: $e');
+    resetForm();
     return false;
   }
 }
 
- void _updateFormWithTreeDetails(TreeDetails tree) {
-   print('\n=== CẬP NHẬT FORM VỚI DỮ LIỆU CÂY ==='); 
-   print('ID ban đầu: $editingId');
-   print('ID cây từ dữ liệu: ${tree.id}');
-   print('ID loại cây: ${tree.masterTreeId}');
-   
-   coordinateXController.text = tree.coordinateX?.toString() ?? '';
-   coordinateYController.text = tree.coordinateY?.toString() ?? '';
-   heightController.text = tree.height?.toString() ?? '';
-   diameterController.text = tree.diameter?.toString() ?? '';
-   selectedCoverLevel = tree.coverLevel;
-   seaLevelController.text = tree.seaLevel?.toString() ?? '';
-   noteController.text = tree.note ?? '';
-   imageBase64 = tree.imageBase64;
-   
-   if (tree.masterInfo != null) {
-     selectedTree = tree.masterInfo;
-     updateTreeInfo(tree.masterInfo);
-     print('Đã cập nhật thông tin loại cây: ${tree.masterInfo!.treeType}');
-   }
- }
+void _updateFormWithTreeDetails(TreeDetails tree) {
+  print('\n=== CẬP NHẬT FORM VỚI DỮ LIỆU CÂY ==='); 
+  print('ID ban đầu: ${tree.id}');  // ID của tree_details
+  print('Master Tree ID: ${tree.masterTreeId}');
+  
+  editingId = tree.id;  // Đảm bảo lưu đúng ID của tree_details
+  
+  coordinateXController.text = tree.coordinateX?.toString() ?? '';
+  coordinateYController.text = tree.coordinateY?.toString() ?? '';
+  heightController.text = tree.height?.toString() ?? '';
+  diameterController.text = tree.diameter?.toString() ?? '';
+  selectedCoverLevel = tree.coverLevel;
+  seaLevelController.text = tree.seaLevel?.toString() ?? '';
+  noteController.text = tree.note ?? '';
+  imageBase64 = tree.imageBase64;
+  
+  if (tree.masterInfo != null) {
+    selectedTree = tree.masterInfo;
+    updateTreeInfo(tree.masterInfo);
+    print('Đã cập nhật thông tin loại cây: ${tree.masterInfo!.treeType}');
+  }
+}
 
  Future<bool> handleSubmit() async {
    print('\n=== XỬ LÝ SUBMIT FORM ===');

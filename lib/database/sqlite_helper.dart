@@ -1,3 +1,4 @@
+import 'package:golon_babe/database/sqlite/sqlite_additional_images.dart';
 import 'package:golon_babe/database/sqlite/sqlite_core.dart';
 import 'package:golon_babe/database/sqlite/sqlite_master_tree.dart';
 import 'package:golon_babe/database/sqlite/sqlite_tree_details.dart';
@@ -8,12 +9,14 @@ class SQLiteHelper {
   final SQLiteCore _core = SQLiteCore();
   late final SQLiteMasterTree masterTree;
   late final SQLiteTreeDetails treeDetails;
+  late final SQLiteAdditionalImages additionalImages;
   
   factory SQLiteHelper() => _instance;
   
   SQLiteHelper._internal() {
     masterTree = SQLiteMasterTree(_core);
     treeDetails = SQLiteTreeDetails(_core);
+    additionalImages = SQLiteAdditionalImages(_core);
   }
 
   // Kiểm tra database đã có dữ liệu chưa
@@ -200,6 +203,18 @@ class SQLiteHelper {
       print('Lỗi khi in thông tin cấu trúc: $e');
     }
   }
+
+  Future<List<Map<String, dynamic>>> getPendingSyncImages() async {
+    return await additionalImages.getPendingSyncImages();
+  }
+
+  Future<void> markImageAsSynced(int id) async {
+    await additionalImages.markAsSynced(id);
+  }
+
+  Future<bool> deleteAdditionalImage(int id) async {
+  return await additionalImages.deleteImage(id);
+}
 
   // Đóng kết nối database
   Future<void> close() async {

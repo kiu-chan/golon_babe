@@ -133,19 +133,28 @@ Future<int> saveImage(TreeAdditionalImage image) async {
     }
   }
 
-  Future<List<Map<String, dynamic>>> getPendingSyncImages() async {
-    try {
-      final db = await _core.database;
-      return await db.query(
-        'tree_additional_images',
-        where: 'sync_status = ?',
-        whereArgs: ['pending'],
-      );
-    } catch (e) {
-      print('Lỗi khi lấy ảnh phụ chờ đồng bộ: $e');
-      return [];
+Future<List<Map<String, dynamic>>> getPendingSyncImages() async {
+  try {
+    print('\n=== LẤY ẢNH PHỤ ĐANG CHỜ ĐỒNG BỘ ===');
+    final db = await _core.database;
+    
+    final results = await db.query(
+      'tree_additional_images',
+      where: 'sync_status = ?',
+      whereArgs: ['pending'],
+    );
+    
+    print('Có ${results.length} ảnh phụ đang chờ đồng bộ:');
+    for (var img in results) {
+      print('- ID: ${img['id']}, Tree ID: ${img['tree_detail_id']}');
     }
+    
+    return results;
+  } catch (e) {
+    print('Lỗi khi lấy ảnh phụ chờ đồng bộ: $e');
+    return [];
   }
+}
 
   Future<void> markAsSynced(int id) async {
     try {

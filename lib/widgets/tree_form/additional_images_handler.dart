@@ -32,33 +32,35 @@ class _AdditionalImagesHandlerState extends State<AdditionalImagesHandler> {
     _images = widget.initialImages;
   }
 
-  Future<void> _pickImage({ImageSource source = ImageSource.gallery}) async {
-    try {
-      final XFile? photo = await _picker.pickImage(
-        source: source,
-        maxWidth: 1024,
-        maxHeight: 1024,
-        imageQuality: 85,
-      );
+Future<void> _pickImage({ImageSource source = ImageSource.gallery}) async {
+  try {
+    final XFile? photo = await _picker.pickImage(
+      source: source,
+      maxWidth: 1024,
+      maxHeight: 1024,
+      imageQuality: 85,
+    );
 
-      if (photo != null && mounted) {
-        final String? base64Image = await _convertImageToBase64(photo.path);
-        if (base64Image != null) {
-          final newImage = TreeAdditionalImage(
-            treeDetailId: widget.treeId,
-            imageBase64: base64Image,
-          );
-          
-          widget.onImageAdded(newImage);
-          setState(() {
-            _images.add(newImage);
-          });
-        }
+    if (photo != null && mounted) {
+      final String? base64Image = await _convertImageToBase64(photo.path);
+      if (base64Image != null) {
+        print('Thêm ảnh phụ cho tree detail ID: ${widget.treeId}');
+        
+        final newImage = TreeAdditionalImage(
+          treeDetailId: widget.treeId,  // Đây là tree_details ID
+          imageBase64: base64Image,
+        );
+        
+        widget.onImageAdded(newImage);
+        setState(() {
+          _images.add(newImage);
+        });
       }
-    } catch (e) {
-      print('Lỗi khi chọn ảnh phụ: $e');
     }
+  } catch (e) {
+    print('Lỗi khi chọn ảnh phụ: $e');
   }
+}
 
   Future<String?> _convertImageToBase64(String imagePath) async {
     try {
