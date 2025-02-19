@@ -4,7 +4,7 @@ import 'package:path/path.dart';
 class SQLiteCore {
   static Database? _database;
   static final SQLiteCore _instance = SQLiteCore._internal();
-  
+
   factory SQLiteCore() => _instance;
   SQLiteCore._internal();
 
@@ -17,7 +17,7 @@ class SQLiteCore {
   Future<Database> _initDB() async {
     String path = await getDatabasesPath();
     String dbPath = join(path, 'trees_database.db');
-    
+
     print('Khởi tạo database tại: $dbPath');
 
     return await openDatabase(
@@ -25,7 +25,7 @@ class SQLiteCore {
       version: 1,
       onCreate: (Database db, int version) async {
         print('Tạo các bảng database...');
-        
+
         // Bảng master_tree_info
         await db.execute('''
           CREATE TABLE master_tree_info (
@@ -65,11 +65,29 @@ class SQLiteCore {
           )
         ''');
 
+        await db.execute('''
+  CREATE TABLE tree_additional_images (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tree_detail_id INTEGER NOT NULL,
+    image_base64 TEXT NOT NULL,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    sync_status TEXT DEFAULT 'pending',
+    FOREIGN KEY (tree_detail_id) REFERENCES tree_details(id)
+      ON DELETE CASCADE
+      ON UPDATE CASCADE
+  )
+''');
+
         // Tạo các indexes để tối ưu truy vấn
-        await db.execute('CREATE INDEX idx_master_tree_id ON tree_details(master_tree_id)');
-        await db.execute('CREATE INDEX idx_sync_status ON tree_details(sync_status)');
-        await db.execute('CREATE INDEX idx_created_at ON tree_details(created_at)');
-        
+        await db.execute(
+            'CREATE INDEX idx_master_tree_id ON tree_details(master_tree_id)');
+        await db.execute(
+            'CREATE INDEX idx_sync_status ON tree_details(sync_status)');
+        await db
+            .execute('CREATE INDEX idx_created_at ON tree_details(created_at)');
+        await db.execute(
+            'CREATE INDEX idx_tree_detail_id ON tree_additional_images(tree_detail_id)');
+
         print('Đã tạo xong cấu trúc database');
       },
       onUpgrade: (db, oldVersion, newVersion) async {

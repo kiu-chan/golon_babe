@@ -1,4 +1,8 @@
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:golon_babe/database/postgres/postgres_additional_images.dart';
+import 'package:golon_babe/database/postgres/postgres_core.dart';
+import 'package:golon_babe/database/sqlite/sqlite_additional_images.dart';
+import 'package:golon_babe/database/sqlite/sqlite_core.dart';
 import '../database/database_helper.dart';
 import '../database/sqlite_helper.dart';
 import '../models/tree_model.dart';
@@ -13,6 +17,8 @@ class TreeRepository {
   late final TreeSyncRepository _syncRepo;
   late final TreeLocalRepository _localRepo;
   late final TreeRemoteRepository _remoteRepo;
+  late final PostgresAdditionalImages _remoteAdditionalImages;
+  late final SQLiteAdditionalImages _localAdditionalImages;
   bool _isSyncing = false;
   bool _isOnline = true;
 
@@ -26,9 +32,10 @@ class TreeRepository {
     _syncRepo = TreeSyncRepository(_remoteDb, _localDb);
     _localRepo = TreeLocalRepository(_localDb);
     _remoteRepo = TreeRemoteRepository(_remoteDb);
+_remoteAdditionalImages = PostgresAdditionalImages(PostgresCore());
+_localAdditionalImages = SQLiteAdditionalImages(SQLiteCore());
   }
 
-  // Kiểm tra kết nối
   Future<bool> hasInternetConnection() async {
     try {
       print('\n=== KIỂM TRA KẾT NỐI ===');
@@ -53,17 +60,14 @@ class TreeRepository {
     }
   }
 
-  // Kiểm tra có dữ liệu local
   Future<bool> hasLocalData() async {
     return await _localRepo.hasData();
   }
 
-  // Lấy danh sách cây mẫu từ local
   Future<List<MasterTreeInfo>> getLocalMasterTreeInfo() async {
     return await _localRepo.getLocalMasterTreeInfo();
   }
 
-  // Lấy danh sách cây mẫu
   Future<List<MasterTreeInfo>> getAllMasterTreeInfo() async {
     try {
       print('\n=== LẤY DANH SÁCH CÂY MẪU ===');
@@ -74,7 +78,6 @@ class TreeRepository {
         print('Online - Lấy dữ liệu từ server...');
         final remoteData = await _remoteRepo.getMasterTreeInfo();
         
-        // Lưu vào local
         await _localRepo.saveMasterTreeInfo(remoteData);
         print('Đã lưu ${remoteData.length} loại cây vào local');
         
@@ -93,7 +96,6 @@ class TreeRepository {
     }
   }
 
-  // Lấy chi tiết cây theo ID
   Future<TreeDetails?> getTreeDetailsById(int id) async {
     try {
       print('\n=== TÌM KIẾM CHI TIẾT CÂY ID: $id ===');
@@ -108,7 +110,6 @@ class TreeRepository {
           print('Đã tìm thấy cây trên server');
           final treeDetails = TreeDetails.fromJson(remoteData);
           
-          // Cập nhật vào local
           await _localRepo.saveTreeDetail(treeDetails, syncStatus: 'synced');
           print('Đã cập nhật dữ liệu vào local');
           
@@ -126,7 +127,6 @@ class TreeRepository {
     }
   }
 
-  // Lấy và lưu tất cả chi tiết cây
   Future<void> getAllTreeDetailsAndSaveLocal() async {
     try {
       if (!await hasInternetConnection()) {
@@ -139,22 +139,18 @@ class TreeRepository {
       final treeDetails = await _remoteRepo.getAllTreeDetails();
       print('Đã lấy ${treeDetails.length} chi tiết cây từ server');
 
-      // Lưu trữ các bản ghi pending
       final pendingDetails = await _localRepo.getPendingSyncDetails();
       print('Có ${pendingDetails.length} bản ghi đang chờ đồng bộ');
 
-      // Xóa tree_details đã đồng bộ
       await _localRepo.clearSyncedDetails();
       print('Đã xóa các bản ghi đã đồng bộ');
 
-      // Khôi phục lại các bản ghi pending
       for (var detail in pendingDetails) {
         final treeDetails = TreeDetails.fromJson(detail);
         await _localRepo.saveTreeDetail(treeDetails, syncStatus: 'pending');
       }
       print('Đã khôi phục ${pendingDetails.length} bản ghi pending');
 
-      // Lưu dữ liệu mới từ server
       int savedCount = 0;
       for (var detail in treeDetails) {
         try {
@@ -174,7 +170,6 @@ class TreeRepository {
     }
   }
 
-  // Lưu thông tin cây
   Future<bool> saveTreeDetails(TreeDetails details) async {
     try {
       print('\n=== LƯU THÔNG TIN CÂY ===');
@@ -188,7 +183,6 @@ class TreeRepository {
       
       final isConnected = await hasInternetConnection();
 
-      // Luôn lưu vào local trước
       final localSuccess = await _localRepo.saveTreeDetail(details);
       if (!localSuccess) {
         print('Lỗi lưu local database');
@@ -196,7 +190,6 @@ class TreeRepository {
       }
       print('Đã lưu thành công vào local database');
 
-      // Nếu online thì đồng bộ ngay
       if (isConnected) {
         print('Online - Đồng bộ lên server...');
         final success = await _remoteRepo.saveTreeDetails(details);
@@ -217,7 +210,109 @@ class TreeRepository {
     }
   }
 
-  // Đồng bộ dữ liệu
+Future<List<TreeAdditionalImage>> getAdditionalImages(int treeId) async {
+  try {
+    print('\n=== LẤY DANH SÁCH ẢNH PHỤ ===');
+    print('Tree Detail ID ban đầu: $treeId');
+    
+    // Lấy chi tiết cây để xác nhận ID
+    final treeDetail = await getTreeDetailsById(treeId);
+    if (treeDetail == null) {
+      print('Không tìm thấy thông tin cây ID: $treeId');
+      return [];
+    }
+    
+    final actualTreeId = treeDetail.id ?? treeId;
+    print('Tree Detail ID thực tế sẽ dùng: $actualTreeId');
+    
+    final isConnected = await hasInternetConnection();
+    print('Trạng thái kết nối: ${isConnected ? "Online" : "Offline"}');
+    
+    if (isConnected) {
+      print('Online - Lấy ảnh phụ từ server...');
+      final remoteImages = await _remoteAdditionalImages.getImagesByTreeId(actualTreeId);
+      print('Đã lấy ${remoteImages.length} ảnh phụ từ server');
+      
+      // Lưu vào local
+      print('Đang lưu ảnh phụ vào local...');
+      for (var image in remoteImages) {
+        final localId = await _localAdditionalImages.saveImage(
+          TreeAdditionalImage(
+            treeDetailId: actualTreeId,
+            imageBase64: image.imageBase64,
+            id: image.id,
+            createdAt: image.createdAt,
+          )
+        );
+        await _localAdditionalImages.markAsSynced(localId);
+      }
+      print('Đã lưu xong ảnh phụ vào local');
+      
+      return remoteImages;
+    }
+    
+    print('Offline - Lấy ảnh phụ từ local...');
+    final localImages = await _localAdditionalImages.getImagesByTreeId(actualTreeId);
+    print('Đã lấy ${localImages.length} ảnh phụ từ local');
+    return localImages;
+    
+  } catch (e) {
+    print('Lỗi khi lấy ảnh phụ: $e');
+    print('Stack trace: ${StackTrace.current}');
+    return [];
+  }
+}
+
+Future<bool> saveAdditionalImage(TreeAdditionalImage image) async {
+  try {
+    print('\n=== BẮT ĐẦU LƯU ẢNH PHỤ ===');
+    final isConnected = await hasInternetConnection();
+    print('Trạng thái kết nối: ${isConnected ? "Online" : "Offline"}');
+    
+    // Lưu vào local trước
+    final localId = await _localAdditionalImages.saveImage(image);
+    print('Đã lưu ảnh phụ vào local với ID: $localId');
+    
+    if (isConnected) {
+      print('Đang đồng bộ ảnh phụ lên server...');
+      final success = await _remoteAdditionalImages.saveImage(image);
+      if (success) {
+        print('Đã đồng bộ ảnh phụ lên server thành công');
+        await _localAdditionalImages.markAsSynced(localId);
+        print('Đã đánh dấu ảnh phụ đã đồng bộ trong local');
+      } else {
+        print('Không thể đồng bộ ảnh phụ lên server');
+      }
+      return success;
+    }
+    
+    print('Offline - Đã lưu ảnh phụ vào local, sẽ đồng bộ sau');
+    return true;
+  } catch (e) {
+    print('Lỗi khi lưu ảnh phụ: $e');
+    return false;
+  }
+}
+
+  Future<bool> deleteAdditionalImage(int id) async {
+    try {
+      final isConnected = await hasInternetConnection();
+      
+      if (isConnected) {
+        final success = await _remoteAdditionalImages.deleteImage(id);
+        if (success) {
+          await _localAdditionalImages.deleteImage(id);
+        }
+        return success;
+      }
+      
+      return await _localAdditionalImages.deleteImage(id);
+    } catch (e) {
+      print('Lỗi khi xóa ảnh phụ: $e');
+      return false;
+    }
+  }
+
   Future<void> syncData() async {
     if (_isSyncing || !await hasInternetConnection()) {
       print('Đang đồng bộ hoặc không có mạng, bỏ qua');
@@ -241,76 +336,9 @@ class TreeRepository {
     }
   }
 
-  // Xóa cây
-  Future<bool> deleteTreeDetail(int id) async {
-    try {
-      print('\n=== XÓA CÂY ID: $id ===');
-      
-      final isConnected = await hasInternetConnection();
-
-      if (isConnected) {
-        print('Online - Xóa từ server...');
-        final success = await _remoteRepo.deleteTreeDetail(id);
-        if (success) {
-          await _localRepo.deleteTreeDetail(id);
-          print('Đã xóa thành công');
-          return true;
-        }
-      } else {
-        print('Offline - Đánh dấu xóa khi online...');
-        await _localRepo.markForDeletion(id);
-        print('Đã đánh dấu xóa khi online');
-        return true;
-      }
-    } catch (e) {
-      print('Lỗi xóa cây $id: $e');
-      _isOnline = false;
-    }
-    return false;
-  }
-
-  // Kiểm tra và xử lý các bản ghi đang chờ xóa
-  Future<void> handlePendingDeletes() async {
-    if (!_isOnline) return;
-    
-    try {
-      print('\n=== XỬ LÝ CÁC BẢN GHI CHỜ XÓA ===');
-      await _syncRepo.handlePendingDeletes();
-    } catch (e) {
-      print('Lỗi xử lý bản ghi chờ xóa: $e');
-    }
-  }
-
-  // In thông tin dữ liệu đã lưu
-  Future<void> printSavedData() async {
-    try {
-      print('\n=== THÔNG TIN DỮ LIỆU ĐÃ LƯU ===');
-      await _localRepo.printSavedData();
-      print('=== KẾT THÚC THÔNG TIN ===\n');
-    } catch (e) {
-      print('Lỗi khi in thông tin dữ liệu: $e');
-    }
-  }
-
-  // In thông tin debug  
-  Future<void> printDebugInfo() async {
-    print('\n=== THÔNG TIN DEBUG ===');
-    print('Trạng thái online: $_isOnline');
-    print('Đang đồng bộ: $_isSyncing');
-    await _localRepo.printDebugInfo();
-    print('=== KẾT THÚC DEBUG ===\n');
-  }
-
-  // Xóa dữ liệu local
-  Future<void> clearLocalData() async {
-    await _localRepo.clearAllData();
-  }
-
-  // Getters
   bool get isSyncing => _isSyncing;
   bool get isOnline => _isOnline;
 
-  // Đóng kết nối
   Future<void> dispose() async {
     await _remoteDb.close();
     await _localDb.close();

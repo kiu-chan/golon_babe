@@ -5,6 +5,7 @@ import 'package:golon_babe/widgets/tree_form/camera_handler.dart';
 import 'package:golon_babe/widgets/tree_form/tree_form_controller.dart';
 import 'package:golon_babe/widgets/tree_form/tree_form_widgets.dart';
 import 'package:golon_babe/widgets/tree_form/tree_form_styles.dart';
+import 'package:golon_babe/widgets/tree_form/additional_images_handler.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 
 class TreeForm extends StatefulWidget {
@@ -39,55 +40,47 @@ class _TreeFormState extends State<TreeForm> {
     _loadMasterTreeList();
   }
 
-Future<void> _setupConnectivity() async {
-  try {
-    final connectivity = Connectivity();
-    
-    // Kiểm tra kết nối ban đầu
-    final result = await connectivity.checkConnectivity();
-    final hasConnection = result != ConnectivityResult.none;
-    
-    // Kiểm tra kết nối database nếu có mạng
-    final isConnected = hasConnection ? 
-        await widget.repository.hasInternetConnection() : false;
-    
-    if (mounted) {
-      setState(() => _isOnline = isConnected);
-      if (isConnected != _isOnline) {
-        _showConnectivitySnackBar();
-      }
-    }
-
-    // Lắng nghe sự thay đổi kết nối
-    connectivity.onConnectivityChanged.listen((result) async {
-      if (!mounted) return;
-      
+  Future<void> _setupConnectivity() async {
+    try {
+      final connectivity = Connectivity();
+      final result = await connectivity.checkConnectivity();
       final hasConnection = result != ConnectivityResult.none;
-      if (hasConnection) {
-        // Kiểm tra kết nối database khi có mạng
-        final isConnected = await widget.repository.hasInternetConnection();
-        if (mounted && isConnected != _isOnline) {
-          setState(() => _isOnline = isConnected);
+      final isConnected = hasConnection ? await widget.repository.hasInternetConnection() : false;
+      
+      if (mounted) {
+        setState(() => _isOnline = isConnected);
+        if (isConnected != _isOnline) {
           _showConnectivitySnackBar();
-          if (isConnected) {
-            // Tải lại dữ liệu khi kết nối được khôi phục
-            await _loadMasterTreeList();
+        }
+      }
+
+      connectivity.onConnectivityChanged.listen((result) async {
+        if (!mounted) return;
+        
+        final hasConnection = result != ConnectivityResult.none;
+        if (hasConnection) {
+          final isConnected = await widget.repository.hasInternetConnection();
+          if (mounted && isConnected != _isOnline) {
+            setState(() => _isOnline = isConnected);
+            _showConnectivitySnackBar();
+            if (isConnected) {
+              await _loadMasterTreeList();
+            }
+          }
+        } else {
+          if (mounted && _isOnline) {
+            setState(() => _isOnline = false);
+            _showConnectivitySnackBar();
           }
         }
-      } else {
-        if (mounted && _isOnline) {
-          setState(() => _isOnline = false);
-          _showConnectivitySnackBar();
-        }
+      });
+    } catch (e) {
+      print('Lỗi kiểm tra kết nối: $e');
+      if (mounted) {
+        setState(() => _isOnline = false);
       }
-    });
-  } catch (e) {
-    print('Lỗi kiểm tra kết nối: $e');
-    if (mounted) {
-      setState(() => _isOnline = false);
     }
   }
-}
 
   Future<void> _loadMasterTreeList() async {
     try {
@@ -95,7 +88,6 @@ Future<void> _setupConnectivity() async {
       if (mounted) {
         setState(() {
           _localMasterTreeList = localData;
-          print('Đã load ${_localMasterTreeList.length} master trees từ local');
         });
       }
     } catch (e) {
@@ -137,19 +129,14 @@ Future<void> _setupConnectivity() async {
     if (_controller.selectedTree != null) {
       try {
         if (_localMasterTreeList.isEmpty) {
-          print('Danh sách master tree trống, đang tải lại...');
           _loadMasterTreeList();
           return;
         }
 
         final existingTree = _localMasterTreeList.firstWhere(
           (tree) => tree.id == _controller.selectedTree!.id,
-          orElse: () {
-            print('Không tìm thấy cây ${_controller.selectedTree!.id}, dùng cây đầu tiên');
-            return _localMasterTreeList.first;
-          },
+          orElse: () => _localMasterTreeList.first,
         );
-        print('Đã tìm thấy master tree: ${existingTree.treeType}');
         _controller.updateTreeInfo(existingTree);
       } catch (e) {
         print('Lỗi khi validate selected tree: $e');
@@ -269,13 +256,6 @@ Future<void> _setupConnectivity() async {
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.all(16),
         duration: const Duration(seconds: 3),
-        action: SnackBarAction(
-          label: 'Đóng',
-          textColor: Colors.white,
-          onPressed: () {
-            ScaffoldMessenger.of(context).hideCurrentSnackBar();
-          },
-        ),
       ),
     );
   }
@@ -436,36 +416,58 @@ Future<void> _setupConnectivity() async {
                     style: TreeFormStyles.subtitleStyle(),
                   ),
                   const SizedBox(height: 20),
-CameraHandler(
-  currentImageBase64: _controller.imageBase64,
-  onImageSelected: (String base64String) {
-    setState(() {
-      _controller.imageBase64 = base64String.isNotEmpty 
-          ? base64String 
-          : null;
-    });
-  },
-  onCoordinatesFound: (longitude, latitude) {
-    if (longitude != null && latitude != null) {
-      setState(() {
-        _controller.coordinateXController.text = longitude.toStringAsFixed(6);
-        _controller.coordinateYController.text = latitude.toStringAsFixed(6);
-      });
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Đã lấy tọa độ từ ảnh thành công'),
-          backgroundColor: Colors.green,
-          duration: Duration(seconds: 2),
-        ),
-      );
-    }
-  },
-),
+                  CameraHandler(
+                    currentImageBase64: _controller.imageBase64,
+                    onImageSelected: (String base64String) {
+                      setState(() {
+                        _controller.imageBase64 = base64String.isNotEmpty 
+                            ? base64String 
+                            : null;
+                      });
+                    },
+                    onCoordinatesFound: (longitude, latitude) {
+                      if (longitude != null && latitude != null) {
+                        setState(() {
+                          _controller.coordinateXController.text = longitude.toStringAsFixed(6);
+                          _controller.coordinateYController.text = latitude.toStringAsFixed(6);
+                        });
+                      }
+                    },
+                  ),
                 ],
               ),
             ),
             const SizedBox(height: 24),
+
+            if (_controller.imageBase64 != null && _controller.editingId != null) ...[
+              Container(
+                decoration: TreeFormStyles.cardDecoration(),
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Ảnh phụ', style: TreeFormStyles.titleStyle()),
+const SizedBox(height: 8),
+                    Text(
+                      'Thêm các ảnh phụ của cây',
+                      style: TreeFormStyles.subtitleStyle(),
+                    ),
+                    const SizedBox(height: 16),
+                    AdditionalImagesHandler(
+                      treeId: _controller.editingId!,
+                      initialImages: _controller.additionalImages,
+                      onImageAdded: (image) async {
+                        await widget.repository.saveAdditionalImage(image);
+                      },
+                      onImageDeleted: (id) async {
+                        await widget.repository.deleteAdditionalImage(id);
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+            ],
 
             Container(
               decoration: TreeFormStyles.cardDecoration(),

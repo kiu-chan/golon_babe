@@ -140,3 +140,35 @@ class TreeConstants {
     'Thưa thớt'
   ];
 }
+
+class TreeAdditionalImage {
+  final int? id;
+  final int treeDetailId;
+  final String imageBase64;
+  final String? createdAt;
+
+  TreeAdditionalImage({
+    this.id,
+    required this.treeDetailId,
+    required this.imageBase64,
+    this.createdAt,
+  });
+
+  factory TreeAdditionalImage.fromJson(Map<String, dynamic> json) {
+    return TreeAdditionalImage(
+      id: json['id'],
+      treeDetailId: json['tree_detail_id'],
+      imageBase64: json['image_base64'],
+      createdAt: json['created_at']?.toString(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'tree_detail_id': treeDetailId,
+      'image_base64': imageBase64,
+      'created_at': createdAt,
+    };
+  }
+}
