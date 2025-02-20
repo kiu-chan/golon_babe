@@ -42,48 +42,83 @@ Future<List<TreeAdditionalImage>> getImagesByTreeId(int treeId) async {
   }
 }
 
-Future<int> saveImage(TreeAdditionalImage image) async {
+Future<int> saveImage(TreeAdditionalImage image, {String syncStatus = 'pending'}) async {
   try {
     print('\n=== LƯU ẢNH PHỤ VÀO SQLITE ===');
     final db = await _core.database;
     
-    // Kiểm tra ảnh đã tồn tại chưa
+    String? imageBase64 = image.imageBase64;
+    if (imageBase64.contains(',')) {
+      print('Phát hiện data URI, đang xử lý...');
+      imageBase64 = imageBase64.split(',')[1];
+    }
+
+    print('Tree Detail ID: ${image.treeDetailId}');
+    print('Image Base64 length: ${imageBase64.length}');
+    print('Sync status: $syncStatus');
+
+    final data = {
+      'id': image.id,
+      'tree_detail_id': image.treeDetailId,
+      'image_base64': imageBase64,
+      'created_at': image.createdAt ?? DateTime.now().toIso8601String(),
+      'sync_status': syncStatus,
+    };
+
+    // Kiểm tra xem ảnh đã tồn tại chưa
     if (image.id != null) {
       final existing = await db.query(
         'tree_additional_images',
         where: 'id = ?',
         whereArgs: [image.id],
       );
+      
       if (existing.isNotEmpty) {
-        print('Ảnh đã tồn tại, bỏ qua');
+        // Cập nhật trạng thái đồng bộ
+        final count = await db.update(
+          'tree_additional_images',
+          {'sync_status': syncStatus},
+          where: 'id = ?',
+          whereArgs: [image.id],
+        );
+        print('Đã cập nhật trạng thái đồng bộ cho ảnh ID: ${image.id}');
         return image.id!;
       }
     }
 
-    String? imageBase64 = image.imageBase64;
-    if (imageBase64.contains(',')) {
-      imageBase64 = imageBase64.split(',')[1];
-    }
-
-    final data = {
-      if (image.id != null) 'id': image.id,
-      'tree_detail_id': image.treeDetailId,
-      'image_base64': imageBase64,
-      'created_at': DateTime.now().toIso8601String(),
-      'sync_status': 'pending',
-    };
-
+    // Thêm ảnh mới
     final id = await db.insert(
       'tree_additional_images',
       data,
-      conflictAlgorithm: ConflictAlgorithm.ignore,
+      conflictAlgorithm: ConflictAlgorithm.replace,
     );
     
     print('Đã lưu ảnh phụ với ID: $id');
     return id;
   } catch (e) {
-    print('Lỗi khi lưu ảnh phụ vào SQLite: $e');
+    print('Lỗi khi lưu ảnh phụ vào SQLite:');
+    print(e.toString());
+    print('Stack trace:');
+    print(StackTrace.current);
     throw e;
+  }
+}
+
+Future<bool> isImageSynced(int id) async {
+  try {
+    final db = await _core.database;
+    final results = await db.query(
+      'tree_additional_images',
+      columns: ['sync_status'],
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+
+    if (results.isEmpty) return false;
+    return results.first['sync_status'] == 'synced';
+  } catch (e) {
+    print('Lỗi khi kiểm tra trạng thái đồng bộ: $e');
+    return false;
   }
 }
 
@@ -148,20 +183,18 @@ Future<List<Map<String, dynamic>>> getPendingSyncImages() async {
   }
 }
 
-  Future<void> markAsSynced(int id) async {
-    try {
-      final db = await _core.database;
-      await db.update(
-        'tree_additional_images',
-        {
-          'sync_status': 'synced',
-          'updated_at': DateTime.now().toIso8601String(),
-        },
-        where: 'id = ?',
-        whereArgs: [id],
-      );
-    } catch (e) {
-      print('Lỗi khi đánh dấu ảnh phụ đã đồng bộ: $e');
-    }
+Future<void> markAsSynced(int id) async {
+  try {
+    final db = await _core.database;
+    await db.update(
+      'tree_additional_images',
+      {'sync_status': 'synced'},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+    print('Đã đánh dấu ảnh ID $id đã đồng bộ');
+  } catch (e) {
+    print('Lỗi khi đánh dấu đồng bộ: $e');
   }
+}
 }

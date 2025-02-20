@@ -10,34 +10,42 @@ class PostgresAdditionalImages {
 
  PostgresAdditionalImages(this._core);
 
- Future<List<TreeAdditionalImage>> getImagesByTreeId(int treeId) async {
-   int retryCount = 0;
-   while (retryCount < _maxRetries) {
-     try {
-       final conn = await _core.connection;
-       final results = await conn.mappedResultsQuery('''
-         SELECT * FROM tree_additional_images 
-         WHERE tree_detail_id = @treeId
-         ORDER BY created_at DESC
-       ''', substitutionValues: {'treeId': treeId});
-       
-       return results.map((r) => 
-         TreeAdditionalImage.fromJson(r['tree_additional_images']!)
-       ).toList();
-     } catch (e) {
-       retryCount++;
-       print('Lỗi khi lấy ảnh phụ (lần thử $retryCount): $e');
-       
-       if (retryCount >= _maxRetries) {
-         throw Exception('Không thể lấy ảnh phụ sau $_maxRetries lần thử');
-       }
-       
-       await Future.delayed(Duration(seconds: retryCount));
-       await _core.reconnectIfNeeded();
-     }
-   }
-   throw Exception('Lỗi không xác định trong getImagesByTreeId');
- }
+Future<List<TreeAdditionalImage>> getImagesByTreeId(int treeId) async {
+  int retryCount = 0;
+  while (retryCount < _maxRetries) {
+    try {
+      final conn = await _core.connection;
+      final results = await conn.mappedResultsQuery('''
+        SELECT id, tree_detail_id, image_base64, created_at 
+        FROM tree_additional_images 
+        WHERE tree_detail_id = @treeId
+        ORDER BY created_at DESC
+      ''', substitutionValues: {'treeId': treeId});
+      
+      return results.map((r) {
+        final data = r['tree_additional_images']!;
+        print('Server image - ID: ${data['id']}, Tree ID: ${data['tree_detail_id']}');
+        return TreeAdditionalImage(
+          id: data['id'],
+          treeDetailId: data['tree_detail_id'],
+          imageBase64: data['image_base64'],
+          createdAt: data['created_at']?.toString(),
+        );
+      }).toList();
+    } catch (e) {
+      retryCount++;
+      print('Lỗi khi lấy ảnh phụ (lần thử $retryCount): $e');
+      
+      if (retryCount >= _maxRetries) {
+        throw Exception('Không thể lấy ảnh phụ sau $_maxRetries lần thử');
+      }
+      
+      await Future.delayed(Duration(seconds: retryCount));
+      await _core.reconnectIfNeeded();
+    }
+  }
+  throw Exception('Lỗi không xác định trong getImagesByTreeId');
+}
 
 Future<bool> saveImage(TreeAdditionalImage image) async {
   int retryCount = 0;

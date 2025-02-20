@@ -218,44 +218,51 @@ Future<List<TreeAdditionalImage>> getAdditionalImages(int treeId) async {
     
     final isConnected = await hasInternetConnection();
     print('Trạng thái kết nối: ${isConnected ? "Online" : "Offline"}');
-    
-    // Lấy ảnh từ local trước
-    final localImages = await _localAdditionalImages.getImagesByTreeId(treeId);
-    print('Đã lấy ${localImages.length} ảnh từ local');
-    
-    if (!isConnected) {
-      return localImages;
-    }
-    
-    // Nếu online, lấy thêm từ server
-    print('Online - Lấy thêm ảnh từ server...');
-    final remoteImages = await _remoteAdditionalImages.getImagesByTreeId(treeId);
-    print('Đã lấy ${remoteImages.length} ảnh từ server');
-    
-    // Kết hợp và loại bỏ trùng lặp
-    final Map<int?, TreeAdditionalImage> uniqueImages = {};
-    
-    // Thêm ảnh local
-    for (var image in localImages) {
-      uniqueImages[image.id] = image;
-    }
-    
-    // Thêm ảnh server
-    for (var image in remoteImages) {
-      if (!uniqueImages.containsKey(image.id)) {
-        uniqueImages[image.id] = image;
+
+    if (isConnected) {
+      // Online: lấy từ server và cập nhật local
+      print('Online - Lấy ảnh từ server...');
+      final remoteImages = await _remoteAdditionalImages.getImagesByTreeId(treeId);
+      print('Đã lấy ${remoteImages.length} ảnh từ server');
+
+      // Cập nhật lại local với data từ server
+      for (var image in remoteImages) {
+        await _localAdditionalImages.saveImage(image, syncStatus: 'synced');
       }
+
+      // Xóa những ảnh cũ đã đồng bộ không còn trên server
+      await _cleanupSyncedImages(treeId, remoteImages);
+
+      return remoteImages;
     }
     
-    final result = uniqueImages.values.toList();
-    print('Tổng số ảnh sau khi loại bỏ trùng lặp: ${result.length}');
-    
-    return result;
+    // Offline: chỉ lấy từ local
+    print('Offline - Lấy ảnh từ local...');
+    return await _localAdditionalImages.getImagesByTreeId(treeId);
     
   } catch (e) {
     print('Lỗi khi lấy ảnh phụ: $e');
     print('Stack trace: ${StackTrace.current}');
     return [];
+  }
+}
+
+// Hàm mới để dọn dẹp ảnh cũ
+Future<void> _cleanupSyncedImages(int treeId, List<TreeAdditionalImage> serverImages) async {
+  try {
+    final localImages = await _localAdditionalImages.getImagesByTreeId(treeId);
+    final serverImageIds = serverImages.map((e) => e.id).toSet();
+    
+    for (var localImage in localImages) {
+      if (localImage.id != null && 
+          !serverImageIds.contains(localImage.id) && 
+          await _localAdditionalImages.isImageSynced(localImage.id!)) {
+        print('Xóa ảnh cũ đã đồng bộ ID: ${localImage.id}');
+        await _localAdditionalImages.deleteImage(localImage.id!);
+      }
+    }
+  } catch (e) {
+    print('Lỗi khi dọn dẹp ảnh cũ: $e');
   }
 }
 
