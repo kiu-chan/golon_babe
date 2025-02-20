@@ -66,61 +66,68 @@ class PostgresTreeDetails {
     }
   }
 
-  Future<bool> insertTreeDetail({
-    required int masterTreeId,
-    required Map<String, dynamic> details,
-  }) async {
-    int retryCount = 0;
-    while (retryCount < _maxRetries) {
-      try {
-        final conn = await _core.connection;
-        await conn.transaction((ctx) async {
-          // Kiểm tra master tree tồn tại
-          final masterTree = await ctx.query(
-            'SELECT id FROM master_tree_info WHERE id = @id',
-            substitutionValues: {'id': masterTreeId},
-          );
-          if (masterTree.isEmpty) {
-            throw Exception('Không tìm thấy master tree');
-          }
-
-          await ctx.execute('''
-            INSERT INTO tree_details (
-              master_tree_id, coordinate_x, coordinate_y, height,
-              trunk_diameter, canopy_coverage, sea_level_height,
-              image_base64, notes, created_at
-            ) VALUES (
-              @masterTreeId, @coordX, @coordY, @height,
-              @diameter, @coverage, @seaLevel,
-              @imageBase64, @notes, CURRENT_TIMESTAMP
-            )
-          ''', substitutionValues: {
-            'masterTreeId': masterTreeId,
-            'coordX': details['coordinate_x'],
-            'coordY': details['coordinate_y'],
-            'height': details['height'],
-            'diameter': details['trunk_diameter'],
-            'coverage': details['canopy_coverage'],
-            'seaLevel': details['sea_level_height'],
-            'imageBase64': details['image_base64'],
-            'notes': details['notes'],
-          });
-        });
-        return true;
-      } catch (e) {
-        retryCount++;
-        print('Lỗi khi thêm chi tiết cây (lần thử $retryCount): $e');
-        
-        if (retryCount >= _maxRetries) {
-          return false;
+Future<bool> insertTreeDetail({
+  required int masterTreeId,
+  required Map<String, dynamic> details,
+}) async {
+  int retryCount = 0;
+  while (retryCount < _maxRetries) {
+    try {
+      print('\n=== LƯU CHI TIẾT CÂY LÊN SERVER ===');
+      final conn = await _core.connection;
+      
+      final success = await conn.transaction((ctx) async {
+        // Kiểm tra master tree tồn tại
+        final masterTree = await ctx.query(
+          'SELECT id FROM master_tree_info WHERE id = @id',
+          substitutionValues: {'id': masterTreeId},
+        );
+        if (masterTree.isEmpty) {
+          throw Exception('Không tìm thấy master tree');
         }
-        
-        await Future.delayed(Duration(seconds: retryCount));
-        await _core.reconnectIfNeeded();
+
+        final result = await ctx.execute('''
+          INSERT INTO tree_details (
+            master_tree_id, coordinate_x, coordinate_y, height,
+            trunk_diameter, canopy_coverage, sea_level_height,
+            image_base64, notes, created_at
+          ) VALUES (
+            @masterTreeId, @coordX, @coordY, @height,
+            @diameter, @coverage, @seaLevel,
+            @imageBase64, @notes, CURRENT_TIMESTAMP
+          )
+        ''', substitutionValues: {
+          'masterTreeId': masterTreeId,
+          'coordX': details['coordinate_x'],
+          'coordY': details['coordinate_y'],
+          'height': details['height'],
+          'diameter': details['trunk_diameter'],
+          'coverage': details['canopy_coverage'],
+          'seaLevel': details['sea_level_height'],
+          'imageBase64': details['image_base64'],
+          'notes': details['notes'],
+        });
+
+        return result > 0;
+      });
+
+      print(success ? 'Đã lưu thành công lên server' : 'Lưu thất bại trên server');
+      return success;
+
+    } catch (e) {
+      retryCount++;
+      print('Lỗi khi lưu chi tiết cây (lần thử $retryCount): $e');
+      
+      if (retryCount >= _maxRetries) {
+        return false;
       }
+      
+      await Future.delayed(Duration(seconds: retryCount));
+      await _core.reconnectIfNeeded();
     }
-    return false;
   }
+  return false;
+}
 
   Future<bool> updateTreeDetail({
     required int id,

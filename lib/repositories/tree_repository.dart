@@ -334,12 +334,38 @@ Future<void> syncData() async {
   try {
     print('\n=== BẮT ĐẦU ĐỒNG BỘ DỮ LIỆU ===');
     
+    // Đồng bộ cây trước
     await _syncRepo.syncData();
     await getAllTreeDetailsAndSaveLocal();
+
+    // Đồng bộ ảnh phụ
+    print('\n=== ĐỒNG BỘ ẢNH PHỤ ===');
+    final pendingImages = await _localAdditionalImages.getPendingSyncImages();
+    print('Có ${pendingImages.length} ảnh cần đồng bộ');
+
+    for (var image in pendingImages) {
+      try {
+        final treeImage = TreeAdditionalImage(
+          id: image['id'],
+          treeDetailId: image['tree_detail_id'],
+          imageBase64: image['image_base64'],
+          createdAt: image['created_at'],
+        );
+
+        final success = await _remoteAdditionalImages.saveImage(treeImage);
+        if (success) {
+          await _localAdditionalImages.markAsSynced(image['id']);
+          print('Đã đồng bộ ảnh ${image['id']} thành công');
+        } else {
+          print('Không thể đồng bộ ảnh ${image['id']}');
+        }
+      } catch (e) {
+        print('Lỗi đồng bộ ảnh ${image['id']}: $e');
+      }
+    }
     
-    // Sau khi đồng bộ, cập nhật lại trạng thái online
-    _isOnline = true;
     print('=== HOÀN THÀNH ĐỒNG BỘ DỮ LIỆU ===\n');
+    _isOnline = true;
     
   } catch (e) {
     print('Lỗi trong quá trình đồng bộ: $e');

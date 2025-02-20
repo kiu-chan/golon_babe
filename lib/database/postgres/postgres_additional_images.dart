@@ -62,7 +62,7 @@ Future<bool> saveImage(TreeAdditionalImage image) async {
       print('Tree Detail ID: ${image.treeDetailId}');
       print('Image Base64 length: ${base64String.length}');
       
-      // Kiểm tra và cập nhật nếu ảnh đã tồn tại
+      // Kiểm tra xem ảnh đã tồn tại chưa
       if (image.id != null) {
         final existingImages = await conn.mappedResultsQuery(
           'SELECT id FROM tree_additional_images WHERE id = @id',
@@ -70,12 +70,23 @@ Future<bool> saveImage(TreeAdditionalImage image) async {
         );
         
         if (existingImages.isNotEmpty) {
-          print('Ảnh đã tồn tại, bỏ qua');
-          return true;
+          // Nếu ảnh đã tồn tại, cập nhật
+          final result = await conn.execute('''
+            UPDATE tree_additional_images 
+            SET image_base64 = @imageBase64,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = @id
+          ''', substitutionValues: {
+            'id': image.id,
+            'imageBase64': base64String,
+          });
+          print('Đã cập nhật ảnh hiện có');
+          return result > 0;
         }
       }
       
-      final results = await conn.execute('''
+      // Nếu ảnh chưa tồn tại, thêm mới
+      final result = await conn.execute('''
         INSERT INTO tree_additional_images (
           tree_detail_id, image_base64, created_at
         ) VALUES (
@@ -87,7 +98,7 @@ Future<bool> saveImage(TreeAdditionalImage image) async {
       });
       
       print('Đã lưu ảnh phụ lên server thành công');
-      return results > 0;
+      return result > 0;
       
     } catch (e) {
       retryCount++;

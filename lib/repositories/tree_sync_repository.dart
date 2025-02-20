@@ -35,38 +35,37 @@ class TreeSyncRepository {
    }
  }
 
- Future<void> _syncPendingRecords() async {
-   try {
-     print('\n=== ĐỒNG BỘ BẢN GHI PENDING ===');
-     
-     final pendingRecords = await _localDb.getPendingSyncTreeDetails();
-     print('Có ${pendingRecords.length} bản ghi chưa đồng bộ');
+Future<void> _syncPendingRecords() async {
+  try {
+    print('\n=== ĐỒNG BỘ BẢN GHI PENDING ===');
+    
+    final pendingRecords = await _localDb.getPendingSyncTreeDetails();
+    print('Có ${pendingRecords.length} bản ghi chưa đồng bộ');
 
-     for (var record in pendingRecords) {
-       try {
-         if (record['sync_status'] == 'pending') {
-           print('Đồng bộ bản ghi ID: ${record['id']}...');
-           
-           final treeDetails = TreeDetails.fromJson(record);
-           final success = await _remoteDb.saveTreeDetails(treeDetails);
-           
-           if (success) {
-             await _localDb.markAsSynced(record['id']);
-             print('Đã đồng bộ bản ghi ${record['id']}');
-           } else {
-             print('Không thể đồng bộ bản ghi ${record['id']}');
-           }
-         }
-       } catch (e) {
-         print('Lỗi khi đồng bộ bản ghi ${record['id']}: $e');
-       }
-     }
-     
-   } catch (e) {
-     print('Lỗi khi đồng bộ bản ghi pending: $e');
-     rethrow;
-   }
- }
+    for (var record in pendingRecords) {
+      try {
+        if (record['sync_status'] == 'pending') {
+          print('Đồng bộ bản ghi ID: ${record['id']}...');
+          
+          final treeDetails = TreeDetails.fromJson(record);
+          final success = await _remoteDb.saveTreeDetails(treeDetails);
+          
+          if (success) {
+            print('Đồng bộ lên server thành công, đánh dấu đã đồng bộ');
+            await _localDb.markAsSynced(record['id']);
+            print('Đã đồng bộ bản ghi ${record['id']}');
+          } else {
+            print('Không thể đồng bộ bản ghi ${record['id']} lên server');
+          }
+        }
+      } catch (e) {
+        print('Lỗi khi đồng bộ bản ghi ${record['id']}: $e');
+      }
+    }
+  } catch (e) {
+    print('Lỗi khi đồng bộ bản ghi pending: $e');
+  }
+}
 
 Future<void> _syncPendingAdditionalImages() async {
   try {
@@ -85,22 +84,43 @@ Future<void> _syncPendingAdditionalImages() async {
           imageBase64: image['image_base64'],
           createdAt: image['created_at'],
         );
-        
-        final success = await _remoteDb.saveAdditionalImage(treeImage);
-        
+
+        final success = await _uploadImageToServer(treeImage);
         if (success) {
+          print('Đã đồng bộ ảnh lên server thành công');
           await _localDb.markImageAsSynced(image['id']);
-          print('Đã đánh dấu ảnh phụ ID: ${image['id']} đã đồng bộ');
+          print('Đã đánh dấu ảnh đã đồng bộ trong local');
         } else {
-          print('Không thể đồng bộ ảnh phụ ID: ${image['id']}');
+          print('Không thể đồng bộ ảnh lên server');
         }
       } catch (e) {
-        print('Lỗi khi đồng bộ ảnh phụ ${image['id']}: $e');
+        print('Lỗi khi đồng bộ ảnh ${image['id']}: $e');
       }
     }
   } catch (e) {
     print('Lỗi khi đồng bộ ảnh phụ pending: $e');
   }
+}
+
+Future<bool> _uploadImageToServer(TreeAdditionalImage image) async {
+  int retryCount = 0;
+  while (retryCount < 3) {
+    try {
+      print('Thử tải ảnh lên server (lần ${retryCount + 1})');
+      final success = await _remoteDb.saveAdditionalImage(image);
+      if (success) return true;
+      
+      retryCount++;
+      await Future.delayed(Duration(seconds: retryCount));
+      
+    } catch (e) {
+      print('Lỗi khi tải ảnh lên server: $e');
+      retryCount++;
+      if (retryCount >= 3) return false;
+      await Future.delayed(Duration(seconds: retryCount));
+    }
+  }
+  return false;
 }
 
  Future<void> _syncFromServer() async {

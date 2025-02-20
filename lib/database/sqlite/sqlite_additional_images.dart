@@ -42,7 +42,7 @@ Future<List<TreeAdditionalImage>> getImagesByTreeId(int treeId) async {
   }
 }
 
-Future<int> saveImage(TreeAdditionalImage image, {String syncStatus = 'pending'}) async {
+Future<int> saveImage(TreeAdditionalImage image, {String? syncStatus}) async {
   try {
     print('\n=== LƯU ẢNH PHỤ VÀO SQLITE ===');
     final db = await _core.database;
@@ -53,19 +53,15 @@ Future<int> saveImage(TreeAdditionalImage image, {String syncStatus = 'pending'}
       imageBase64 = imageBase64.split(',')[1];
     }
 
-    print('Tree Detail ID: ${image.treeDetailId}');
-    print('Image Base64 length: ${imageBase64.length}');
-    print('Sync status: $syncStatus');
-
     final data = {
-      'id': image.id,
+      if (image.id != null) 'id': image.id,
       'tree_detail_id': image.treeDetailId,
       'image_base64': imageBase64,
       'created_at': image.createdAt ?? DateTime.now().toIso8601String(),
-      'sync_status': syncStatus,
+      'sync_status': syncStatus ?? 'pending',
     };
 
-    // Kiểm tra xem ảnh đã tồn tại chưa
+    // Kiểm tra ảnh đã tồn tại
     if (image.id != null) {
       final existing = await db.query(
         'tree_additional_images',
@@ -77,7 +73,7 @@ Future<int> saveImage(TreeAdditionalImage image, {String syncStatus = 'pending'}
         // Cập nhật trạng thái đồng bộ
         final count = await db.update(
           'tree_additional_images',
-          {'sync_status': syncStatus},
+          {'sync_status': syncStatus ?? 'pending'},
           where: 'id = ?',
           whereArgs: [image.id],
         );
@@ -86,7 +82,6 @@ Future<int> saveImage(TreeAdditionalImage image, {String syncStatus = 'pending'}
       }
     }
 
-    // Thêm ảnh mới
     final id = await db.insert(
       'tree_additional_images',
       data,
@@ -169,14 +164,26 @@ Future<List<Map<String, dynamic>>> getPendingSyncImages() async {
       'tree_additional_images',
       where: 'sync_status = ?',
       whereArgs: ['pending'],
+      orderBy: 'created_at ASC',
     );
     
-    print('Có ${results.length} ảnh phụ đang chờ đồng bộ:');
-    for (var img in results) {
-      print('- ID: ${img['id']}, Tree ID: ${img['tree_detail_id']}');
+    // Kiểm tra null trước khi truy cập length
+    if (results != null) {
+      print('Có ${results.length} ảnh phụ đang chờ đồng bộ:');
+      for (var img in results) {
+        if (img != null) {
+          // Kiểm tra từng trường của img để tránh lỗi null
+          final id = img['id']?.toString() ?? 'N/A';
+          final treeId = img['tree_detail_id']?.toString() ?? 'N/A';
+          final imageSize = img['image_base64']?.toString().length ?? 0;
+          print('- ID: $id, Tree ID: $treeId, Size: $imageSize');
+        }
+      }
+    } else {
+      print('Không có ảnh phụ đang chờ đồng bộ');
     }
     
-    return results;
+    return results ?? [];
   } catch (e) {
     print('Lỗi khi lấy ảnh phụ chờ đồng bộ: $e');
     return [];

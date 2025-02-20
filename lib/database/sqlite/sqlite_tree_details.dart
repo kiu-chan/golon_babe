@@ -190,24 +190,31 @@ Future<Map<String, dynamic>?> getTreeDetailsById(int id) async {
   }
 
   // Đánh dấu cây đã đồng bộ
-  Future<void> markAsSynced(int id) async {
-    try {
-      final db = await _core.database;
-      await db.update(
+Future<void> markAsSynced(int id) async {
+  try {
+    final db = await _core.database;
+    await db.transaction((txn) async {
+      final count = await txn.update(
         'tree_details',
         {
           'sync_status': 'synced',
           'updated_at': DateTime.now().toIso8601String(),
         },
-        where: 'id = ?',
-        whereArgs: [id],
+        where: 'id = ? AND sync_status = ?',
+        whereArgs: [id, 'pending'],
       );
-      print('Đã đánh dấu đồng bộ cho cây ID $id');
-    } catch (e) {
-      print('Lỗi khi đánh dấu đồng bộ: $e');
-      throw e;
-    }
+      
+      if (count > 0) {
+        print('Đã đánh dấu đồng bộ cho cây ID $id');
+      } else {
+        print('Không tìm thấy cây ID $id hoặc đã đồng bộ');
+      }
+    });
+  } catch (e) {
+    print('Lỗi khi đánh dấu đồng bộ: $e');
+    throw e;
   }
+}
 
   // Xóa chi tiết cây
   Future<bool> deleteTreeDetail(int id) async {
