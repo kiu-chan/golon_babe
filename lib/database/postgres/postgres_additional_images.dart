@@ -39,72 +39,105 @@ class PostgresAdditionalImages {
    throw Exception('Lỗi không xác định trong getImagesByTreeId');
  }
 
- Future<bool> saveImage(TreeAdditionalImage image) async {
-   int retryCount = 0;
-   while (retryCount < _maxRetries) {
-     try {
-       print('\n=== LƯU ẢNH PHỤ LÊN SERVER ===');
-       final conn = await _core.connection;
-       
-       String base64String = image.imageBase64;
-       if (base64String.contains(',')) {
-         base64String = base64String.split(',')[1];
-       }
-       
-       print('Tree Detail ID: ${image.treeDetailId}');
-       print('Image Base64 length: ${base64String.length}');
-       
-       final results = await conn.execute('''
-         INSERT INTO tree_additional_images (
-           tree_detail_id, image_base64, created_at
-         ) VALUES (
-           @treeId, @imageBase64, CURRENT_TIMESTAMP
-         )
-       ''', substitutionValues: {
-         'treeId': image.treeDetailId,
-         'imageBase64': base64String,
-       });
-       
-       print('Đã lưu ảnh phụ lên server thành công');
-       return results > 0;
-     } catch (e) {
-       retryCount++;
-       print('Lỗi khi lưu ảnh phụ (lần thử $retryCount): $e');
-       
-       if (retryCount >= _maxRetries) {
-         print('Đã hết số lần thử');
-         return false;
-       }
-       
-       await Future.delayed(Duration(seconds: retryCount));
-       await _core.reconnectIfNeeded();
-     }
-   }
-   return false;
- }
+Future<bool> saveImage(TreeAdditionalImage image) async {
+  int retryCount = 0;
+  while (retryCount < _maxRetries) {
+    try {
+      print('\n=== LƯU ẢNH PHỤ LÊN SERVER ===');
+      final conn = await _core.connection;
+      
+      String base64String = image.imageBase64;
+      if (base64String.contains(',')) {
+        base64String = base64String.split(',')[1];
+      }
+      
+      print('Tree Detail ID: ${image.treeDetailId}');
+      print('Image Base64 length: ${base64String.length}');
+      
+      // Kiểm tra và cập nhật nếu ảnh đã tồn tại
+      if (image.id != null) {
+        final existingImages = await conn.mappedResultsQuery(
+          'SELECT id FROM tree_additional_images WHERE id = @id',
+          substitutionValues: {'id': image.id},
+        );
+        
+        if (existingImages.isNotEmpty) {
+          print('Ảnh đã tồn tại, bỏ qua');
+          return true;
+        }
+      }
+      
+      final results = await conn.execute('''
+        INSERT INTO tree_additional_images (
+          tree_detail_id, image_base64, created_at
+        ) VALUES (
+          @treeId, @imageBase64, CURRENT_TIMESTAMP
+        )
+      ''', substitutionValues: {
+        'treeId': image.treeDetailId,
+        'imageBase64': base64String,
+      });
+      
+      print('Đã lưu ảnh phụ lên server thành công');
+      return results > 0;
+      
+    } catch (e) {
+      retryCount++;
+      print('Lỗi khi lưu ảnh phụ (lần thử $retryCount): $e');
+      
+      if (retryCount >= _maxRetries) {
+        print('Đã hết số lần thử');
+        return false;
+      }
+      
+      await Future.delayed(Duration(seconds: retryCount));
+      await _core.reconnectIfNeeded();
+    }
+  }
+  return false;
+}
 
- Future<bool> deleteImage(int id) async {
-   int retryCount = 0;
-   while (retryCount < _maxRetries) {
-     try {
-       final conn = await _core.connection;
-       final result = await conn.execute(
-         'DELETE FROM tree_additional_images WHERE id = @id',
-         substitutionValues: {'id': id},
-       );
-       return result > 0;
-     } catch (e) {
-       retryCount++;
-       print('Lỗi khi xóa ảnh phụ (lần thử $retryCount): $e');
-       
-       if (retryCount >= _maxRetries) {
-         return false;
-       }
-       
-       await Future.delayed(Duration(seconds: retryCount));
-       await _core.reconnectIfNeeded();
-     }
-   }
-   return false;
- }
+Future<bool> deleteImage(int id) async {
+  int retryCount = 0;
+  while (retryCount < _maxRetries) {
+    try {
+      print('\n=== XÓA ẢNH PHỤ TRÊN SERVER ===');
+      print('Đang xóa ảnh ID: $id (lần thử ${retryCount + 1})');
+      
+      final conn = await _core.connection;
+      
+      // Kiểm tra ảnh tồn tại
+      final exists = await conn.mappedResultsQuery(
+        'SELECT id FROM tree_additional_images WHERE id = @id',
+        substitutionValues: {'id': id}
+      );
+      
+      if (exists.isEmpty) {
+        print('Ảnh không tồn tại trên server');
+        return true; // Coi như xóa thành công nếu ảnh không tồn tại
+      }
+      
+      final result = await conn.execute(
+        'DELETE FROM tree_additional_images WHERE id = @id',
+        substitutionValues: {'id': id},
+      );
+      
+      print('Kết quả xóa: ${result > 0 ? "thành công" : "thất bại"}');
+      return result > 0;
+      
+    } catch (e) {
+      retryCount++;
+      print('Lỗi khi xóa ảnh phụ (lần thử $retryCount): $e');
+      
+      if (retryCount >= _maxRetries) {
+        print('Đã hết số lần thử');
+        return false;
+      }
+      
+      await Future.delayed(Duration(seconds: retryCount * 2)); // Tăng thời gian chờ
+      await _core.reconnectIfNeeded();
+    }
+  }
+  return false;
+}
 }

@@ -214,48 +214,44 @@ _localAdditionalImages = SQLiteAdditionalImages(SQLiteCore());
 Future<List<TreeAdditionalImage>> getAdditionalImages(int treeId) async {
   try {
     print('\n=== LẤY DANH SÁCH ẢNH PHỤ ===');
-    print('Tree ID ban đầu: $treeId');
+    print('Tree ID: $treeId');
     
     final isConnected = await hasInternetConnection();
     print('Trạng thái kết nối: ${isConnected ? "Online" : "Offline"}');
     
-    // Lấy chi tiết cây để xác nhận đúng ID
-    final treeDetail = await getTreeDetailsById(treeId);
-    if (treeDetail == null) {
-      print('Không tìm thấy thông tin cây ID: $treeId');
-      return [];
-    }
-
-    final correctId = treeDetail.id ?? treeId;
-    print('ID cây sẽ sử dụng để tìm ảnh phụ: $correctId');
+    // Lấy ảnh từ local trước
+    final localImages = await _localAdditionalImages.getImagesByTreeId(treeId);
+    print('Đã lấy ${localImages.length} ảnh từ local');
     
-    if (isConnected) {
-      print('Online - Lấy ảnh phụ từ server...');
-      final remoteImages = await _remoteAdditionalImages.getImagesByTreeId(correctId);
-      print('Đã lấy ${remoteImages.length} ảnh phụ từ server');
-      
-      // Lưu lại vào local
-      print('Đang lưu ảnh phụ vào local...');
-      for (var image in remoteImages) {
-        final localImage = TreeAdditionalImage(
-          treeDetailId: correctId,
-          imageBase64: image.imageBase64,
-          id: image.id,
-          createdAt: image.createdAt,
-        );
-        final localId = await _localAdditionalImages.saveImage(localImage);
-        await _localAdditionalImages.markAsSynced(localId);
-        print('Đã lưu ảnh phụ với ID $localId vào local');
+    if (!isConnected) {
+      return localImages;
+    }
+    
+    // Nếu online, lấy thêm từ server
+    print('Online - Lấy thêm ảnh từ server...');
+    final remoteImages = await _remoteAdditionalImages.getImagesByTreeId(treeId);
+    print('Đã lấy ${remoteImages.length} ảnh từ server');
+    
+    // Kết hợp và loại bỏ trùng lặp
+    final Map<int?, TreeAdditionalImage> uniqueImages = {};
+    
+    // Thêm ảnh local
+    for (var image in localImages) {
+      uniqueImages[image.id] = image;
+    }
+    
+    // Thêm ảnh server
+    for (var image in remoteImages) {
+      if (!uniqueImages.containsKey(image.id)) {
+        uniqueImages[image.id] = image;
       }
-      
-      return remoteImages;
     }
     
-    print('Offline - Lấy ảnh phụ từ local...');
-    final localImages = await _localAdditionalImages.getImagesByTreeId(correctId);
-    print('Đã lấy ${localImages.length} ảnh phụ từ local');
+    final result = uniqueImages.values.toList();
+    print('Tổng số ảnh sau khi loại bỏ trùng lặp: ${result.length}');
     
-    return localImages;
+    return result;
+    
   } catch (e) {
     print('Lỗi khi lấy ảnh phụ: $e');
     print('Stack trace: ${StackTrace.current}');
@@ -294,24 +290,32 @@ Future<bool> saveAdditionalImage(TreeAdditionalImage image) async {
   }
 }
 
-  Future<bool> deleteAdditionalImage(int id) async {
-    try {
-      final isConnected = await hasInternetConnection();
-      
-      if (isConnected) {
-        final success = await _remoteAdditionalImages.deleteImage(id);
-        if (success) {
-          await _localAdditionalImages.deleteImage(id);
-        }
-        return success;
-      }
-      
-      return await _localAdditionalImages.deleteImage(id);
-    } catch (e) {
-      print('Lỗi khi xóa ảnh phụ: $e');
-      return false;
+Future<bool> deleteAdditionalImage(int id) async {
+  try {
+    print('\n=== XÓA ẢNH PHỤ ===');
+    final isConnected = await hasInternetConnection();
+    
+    bool remoteSuccess = false;
+    if (isConnected) {
+      // Thử xóa server trước
+      remoteSuccess = await _remoteAdditionalImages.deleteImage(id);
+      print('Xóa ảnh trên server: ${remoteSuccess ? "thành công" : "thất bại"}');
     }
+
+    // Luôn xóa local dù server thành công hay thất bại
+    final localSuccess = await _localAdditionalImages.deleteImage(id);
+    print('Xóa ảnh trên local: ${localSuccess ? "thành công" : "thất bại"}');
+
+    // Trả về true nếu:
+    // - Đang offline và xóa local thành công
+    // - Đang online, xóa server thành công hoặc ảnh không tồn tại trên server
+    return !isConnected ? localSuccess : (remoteSuccess || localSuccess);
+
+  } catch (e) {
+    print('Lỗi khi xóa ảnh phụ: $e');
+    return false;
   }
+}
 
 Future<void> syncData() async {
   if (_isSyncing || !await hasInternetConnection()) {

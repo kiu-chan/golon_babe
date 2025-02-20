@@ -14,14 +14,6 @@ Future<List<TreeAdditionalImage>> getImagesByTreeId(int treeId) async {
     
     final db = await _core.database;
     
-    // Debug: In ra tất cả ảnh phụ
-    final allImages = await db.query('tree_additional_images');
-    print('Tổng số ảnh phụ trong database: ${allImages.length}');
-    print('Danh sách tất cả ảnh:');
-    for (var img in allImages) {
-      print('- ID: ${img['id']}, Tree ID: ${img['tree_detail_id']}, Sync: ${img['sync_status']}');
-    }
-
     // Lấy ảnh theo tree_detail_id
     final results = await db.query(
       'tree_additional_images',
@@ -30,29 +22,17 @@ Future<List<TreeAdditionalImage>> getImagesByTreeId(int treeId) async {
       orderBy: 'created_at DESC',
     );
     
-    print('Tìm thấy ${results.length} ảnh phụ cho tree_detail_id: $treeId');
-    
-    if (results.isEmpty) {
-      print('Thử tìm kiếm lại với điều kiện khác...');
-      // Thử tìm theo master_tree_id từ bảng tree_details
-      final treeDetail = await db.query(
-        'tree_details',
-        where: 'id = ?',
-        whereArgs: [treeId],
-      );
-      
-      if (treeDetail.isNotEmpty) {
-        print('Tìm thấy thông tin cây: ID=${treeDetail.first['id']}, Master ID=${treeDetail.first['master_tree_id']}');
-      }
-    }
+    print('Tìm thấy ${results.length} ảnh phụ');
 
     final images = results.map((map) {
-      print('Chuyển đổi ảnh: ID=${map['id']}, Size=${map['image_base64'].toString().length}');
-      return TreeAdditionalImage.fromJson(map);
+      final image = TreeAdditionalImage.fromJson(map);
+      print('Chuyển đổi ảnh: ID=${image.id}, Size=${image.imageBase64.length}');
+      return image;
     }).toList();
     
     print('Đã chuyển đổi thành công ${images.length} ảnh');
     return images;
+
   } catch (e) {
     print('Lỗi khi lấy ảnh phụ từ SQLite:');
     print(e.toString());
@@ -67,71 +47,83 @@ Future<int> saveImage(TreeAdditionalImage image) async {
     print('\n=== LƯU ẢNH PHỤ VÀO SQLITE ===');
     final db = await _core.database;
     
+    // Kiểm tra ảnh đã tồn tại chưa
+    if (image.id != null) {
+      final existing = await db.query(
+        'tree_additional_images',
+        where: 'id = ?',
+        whereArgs: [image.id],
+      );
+      if (existing.isNotEmpty) {
+        print('Ảnh đã tồn tại, bỏ qua');
+        return image.id!;
+      }
+    }
+
     String? imageBase64 = image.imageBase64;
-    // Xử lý base64 data URI nếu có
     if (imageBase64.contains(',')) {
-      print('Phát hiện data URI, đang xử lý...');
       imageBase64 = imageBase64.split(',')[1];
     }
 
-    print('Tree Detail ID: ${image.treeDetailId}');
-    print('Image Base64 length: ${imageBase64.length}');
-
     final data = {
+      if (image.id != null) 'id': image.id,
       'tree_detail_id': image.treeDetailId,
       'image_base64': imageBase64,
       'created_at': DateTime.now().toIso8601String(),
       'sync_status': 'pending',
     };
 
-    // Nếu có ID, thử update trước
-    if (image.id != null) {
-      print('Cập nhật ảnh phụ ID: ${image.id}');
-      final count = await db.update(
-        'tree_additional_images',
-        data,
-        where: 'id = ?',
-        whereArgs: [image.id],
-      );
-      if (count > 0) {
-        print('Đã cập nhật ảnh phụ thành công');
-        return image.id!;
-      }
-    }
-
-    // Thêm mới nếu không có ID hoặc update thất bại
-    print('Thêm ảnh phụ mới...');
     final id = await db.insert(
       'tree_additional_images',
       data,
-      conflictAlgorithm: ConflictAlgorithm.replace,
+      conflictAlgorithm: ConflictAlgorithm.ignore,
     );
     
     print('Đã lưu ảnh phụ với ID: $id');
     return id;
   } catch (e) {
-    print('Lỗi khi lưu ảnh phụ vào SQLite:');
-    print(e.toString());
-    print('Stack trace:');
-    print(StackTrace.current);
+    print('Lỗi khi lưu ảnh phụ vào SQLite: $e');
     throw e;
   }
 }
 
-  Future<bool> deleteImage(int id) async {
-    try {
-      final db = await _core.database;
-      final count = await db.delete(
-        'tree_additional_images',
-        where: 'id = ?',
-        whereArgs: [id],
-      );
-      return count > 0;
-    } catch (e) {
-      print('Lỗi khi xóa ảnh phụ từ SQLite: $e');
+Future<bool> deleteImage(int id) async {
+  try {
+    print('\n=== XÓA ẢNH PHỤ TỪ SQLITE ===');
+    print('Xóa ảnh ID: $id');
+    
+    final db = await _core.database;
+    
+    // Kiểm tra ảnh tồn tại
+    final existing = await db.query(
+      'tree_additional_images',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+    
+    if (existing.isEmpty) {
+      print('Không tìm thấy ảnh ID: $id');
       return false;
     }
+
+    final count = await db.delete(
+      'tree_additional_images',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+
+    final success = count > 0;
+    print(success ? 'Đã xóa ảnh thành công' : 'Xóa ảnh thất bại');
+    return success;
+
+  } catch (e) {
+    print('Lỗi khi xóa ảnh phụ từ SQLite:');
+    print(e.toString());
+    print('Stack trace:');
+    print(StackTrace.current);
+    return false;
   }
+}
 
 Future<List<Map<String, dynamic>>> getPendingSyncImages() async {
   try {

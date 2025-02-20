@@ -89,9 +89,8 @@ Future<void> _syncPendingAdditionalImages() async {
         final success = await _remoteDb.saveAdditionalImage(treeImage);
         
         if (success) {
-          // Xóa ảnh từ local sau khi đã lưu thành công lên server
-          await _localDb.deleteAdditionalImage(image['id']); 
-          print('Đã xóa ảnh phụ ID: ${image['id']} từ local sau khi đồng bộ');
+          await _localDb.markImageAsSynced(image['id']);
+          print('Đã đánh dấu ảnh phụ ID: ${image['id']} đã đồng bộ');
         } else {
           print('Không thể đồng bộ ảnh phụ ID: ${image['id']}');
         }
